@@ -3,7 +3,7 @@
 // =========================
 
 const STORAGE_KEY = "flightRecords";
-let API_KEY = null; // will be loaded from config.json
+let API_KEY = null; // loaded from config.json
 
 function normalizePassengerNames(names) {
   const map = new Map();
@@ -45,7 +45,8 @@ function saveRecords(records) {
 function updateApiKeyStatus(messageOverride) {
   const statusEl = document.getElementById("api-key-status");
   if (!statusEl) return;
-  statusEl.textContent = messageOverride || (API_KEY ? "API key loaded." : "No API key loaded yet.");
+  statusEl.textContent =
+    messageOverride || (API_KEY ? "API key loaded." : "No API key loaded yet.");
 }
 
 /**
@@ -204,6 +205,26 @@ async function fetchRoute(flightNumberRaw) {
   return route;
 }
 
+/**
+ * Import records from a JSON file.
+ * The file must contain an array of record objects.
+ */
+async function importRecordsFromFile(file) {
+  const text = await file.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    throw new Error("File is not valid JSON.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Expected an array of records in the JSON.");
+  }
+
+  return parsed;
+}
+
 // =========================
 // App bootstrap
 // =========================
@@ -216,9 +237,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectPaxExisting = document.getElementById("pax-existing");
   const inputPaxNew = document.getElementById("pax-new");
   const inputPnr = document.getElementById("pnr");
+  const importBtn = document.getElementById("import-json");
+  const importFileInput = document.getElementById("import-json-file");
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
 
+  // Load existing records from localStorage on launch
   let records = loadRecords();
   renderRecords(records);
   renderPassengerSelect(records);
@@ -350,6 +374,39 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Import JSON (travel file)
+  importBtn.addEventListener("click", () => {
+    if (!importFileInput) return;
+    importFileInput.value = ""; // allow re-selecting same file
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    try {
+      const importedRecords = await importRecordsFromFile(file);
+
+      const useImported = window.confirm(
+        "Replace current log with data from this file?"
+      );
+      if (!useImported) {
+        return;
+      }
+
+      records = importedRecords;
+      saveRecords(records);
+      renderRecords(records);
+      renderPassengerSelect(records);
+      alert("Travel file imported successfully.");
+    } catch (err) {
+      console.error("Import error:", err);
+      alert("Could not import file: " + err.message);
+    }
+  });
+
+  // Download JSON
   downloadBtn.addEventListener("click", () => {
     const dataStr = JSON.stringify(records, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -364,6 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   });
 
+  // Clear all
   clearBtn.addEventListener("click", () => {
     if (!confirm("Clear all saved flights from this device?")) return;
     records = [];
