@@ -3,7 +3,7 @@
 // =========================
 
 const STORAGE_KEY = "flightRecords";
-let API_KEY = null; // loaded from config.json
+let API_KEY = null; // will be loaded from config.json
 
 function normalizePassengerNames(names) {
   const map = new Map();
@@ -142,12 +142,10 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
 
     if (!normRec || normRec !== normTarget) continue;
 
-    // Exact same date → perfect match
     if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
       return rec.route;
     }
 
-    // Remember at least one route for this flight number
     if (!fallbackRoute) {
       fallbackRoute = rec.route;
     }
@@ -210,9 +208,8 @@ async function fetchRoute(flightNumberRaw) {
 /**
  * Force the departure/arrival 'scheduled' fields
  * to equal the user-provided travel date (YYYY-MM-DD).
- * We deliberately ignore the API's date part.
  */
-function adjustRouteForDate(route, flightDate) {
+function adjustRouteDatesToFlightDate(route, flightDate) {
   const copy = JSON.parse(JSON.stringify(route || {}));
 
   if (!copy.departure) copy.departure = {};
@@ -221,33 +218,15 @@ function adjustRouteForDate(route, flightDate) {
   copy.departure.scheduled = flightDate;
   copy.arrival.scheduled = flightDate;
 
-  console.log("adjustRouteForDate:", {
+  console.log("adjustRouteDatesToFlightDate", {
     travelDate: flightDate,
-    before: route,
-    after: copy
+    beforeDeparture: route && route.departure && route.departure.scheduled,
+    beforeArrival: route && route.arrival && route.arrival.scheduled,
+    afterDeparture: copy.departure.scheduled,
+    afterArrival: copy.arrival.scheduled
   });
 
   return copy;
-}
-
-/**
- * Import records from a JSON file.
- * The file must contain an array of record objects.
- */
-async function importRecordsFromFile(file) {
-  const text = await file.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (e) {
-    throw new Error("File is not valid JSON.");
-  }
-
-  if (!Array.isArray(parsed)) {
-    throw new Error("Expected an array of records in the JSON.");
-  }
-
-  return parsed;
 }
 
 // =========================
@@ -262,14 +241,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectPaxExisting = document.getElementById("pax-existing");
   const inputPaxNew = document.getElementById("pax-new");
   const inputPnr = document.getElementById("pnr");
-  const importBtn = document.getElementById("import-json");
-  const importFileInput = document.getElementById("import-json-file");
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
 
-  console.log("Flight Log app script loaded");
-
-  // Load existing records from localStorage on launch
   let records = loadRecords();
   renderRecords(records);
   renderPassengerSelect(records);
@@ -284,8 +258,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const flightDate = inputDate.value;
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
-
-    console.log("Form submit:", { flightNumber, flightDate });
 
     if (!flightNumber) {
       outputEl.textContent = JSON.stringify(
@@ -307,7 +279,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const cachedRoute = findCachedRoute(records, flightNumber, flightDate);
     let route;
 
-    // ---- Route lookup (cache vs API) with date adjustment ----
     try {
       if (cachedRoute) {
         const depAirport =
@@ -331,7 +302,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const useCached = window.confirm(msg);
 
         if (useCached) {
-          route = adjustRouteForDate(cachedRoute, flightDate);
+          // Adjust cached route dates to this travel date
+          route = adjustRouteDatesToFlightDate(cachedRoute, flightDate);
           outputEl.textContent = JSON.stringify(
             { ...route, _source: "cache" },
             null,
@@ -343,19 +315,18 @@ document.addEventListener("DOMContentLoaded", () => {
             null,
             2
           );
-          const freshRoute = await fetchRoute(flightNumber);
-          route = adjustRouteForDate(freshRoute, flightDate);
+          const baseRoute = await fetchRoute(flightNumber);
+          route = adjustRouteDatesToFlightDate(baseRoute, flightDate);
           outputEl.textContent = JSON.stringify(route, null, 2);
         }
       } else {
-        // No cached route: go straight to API
         outputEl.textContent = JSON.stringify(
           { status: "Loading route from API..." },
           null,
           2
         );
-        const freshRoute = await fetchRoute(flightNumber);
-        route = adjustRouteForDate(freshRoute, flightDate);
+        const baseRoute = await fetchRoute(flightNumber);
+        route = adjustRouteDatesToFlightDate(baseRoute, flightDate);
         outputEl.textContent = JSON.stringify(route, null, 2);
       }
     } catch (err) {
@@ -364,7 +335,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // ---- Save record with adjusted route ----
     try {
       const selectedExisting = Array.from(
         selectPaxExisting.selectedOptions || []
@@ -393,8 +363,6 @@ document.addEventListener("DOMContentLoaded", () => {
         route: route
       };
 
-      console.log("Saving record:", record);
-
       records.push(record);
       saveRecords(records);
       renderRecords(records);
@@ -410,39 +378,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Import JSON (travel file)
-  importBtn.addEventListener("click", () => {
-    if (!importFileInput) return;
-    importFileInput.value = ""; // allow re-selecting same file
-    importFileInput.click();
-  });
-
-  importFileInput.addEventListener("change", async (event) => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-
-    try {
-      const importedRecords = await importRecordsFromFile(file);
-
-      const useImported = window.confirm(
-        "Replace current log with data from this file?"
-      );
-      if (!useImported) {
-        return;
-      }
-
-      records = importedRecords;
-      saveRecords(records);
-      renderRecords(records);
-      renderPassengerSelect(records);
-      alert("Travel file imported successfully.");
-    } catch (err) {
-      console.error("Import error:", err);
-      alert("Could not import file: " + err.message);
-    }
-  });
-
-  // Download JSON
   downloadBtn.addEventListener("click", () => {
     const dataStr = JSON.stringify(records, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -457,7 +392,6 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   });
 
-  // Clear all
   clearBtn.addEventListener("click", () => {
     if (!confirm("Clear all saved flights from this device?")) return;
     records = [];
