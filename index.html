@@ -419,6 +419,32 @@
 
       <!-- RIGHT: stored JSON + actions -->
       <section class="card">
+  <div class="card-header">
+    <div class="card-title">Your log</div>
+    <div class="card-note">Stored privately in this browser</div>
+  </div>
+
+  <!-- NEW: API key loader -->
+  <div class="field" style="margin-bottom: 12px;">
+    <label for="api-key-file">API Key file</label>
+    <input id="api-key-file" type="file" accept=".txt,.json" />
+    <small id="api-key-status">No API key loaded yet.</small>
+  </div>
+
+  <div class="button-row" style="margin-bottom: 6px;">
+    <button id="download-json" class="btn btn-ghost">
+      <span class="btn-icon">⬇︎</span>
+      <span>Download JSON</span>
+    </button>
+    <button id="clear-json" class="btn btn-ghost">
+      <span class="btn-icon">🗑</span>
+      <span>Clear All</span>
+    </button>
+  </div>
+
+  <!-- ... rest of the card stays the same ... -->
+
+      <section class="card">
         <div class="card-header">
           <div class="card-title">Your log</div>
           <div class="card-note">Stored privately in this browser</div>
