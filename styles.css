@@ -38,6 +38,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Helper */
+
+.hidden {
+  display: none !important;
+}
+
 /* Shell & top bar */
 
 .app-shell {
@@ -168,6 +174,11 @@ body {
   margin-bottom: 14px;
 }
 
+.card-heading {
+  display: flex;
+  flex-direction: column;
+}
+
 .card-title {
   font-size: 16px;
   font-weight: 600;
@@ -201,6 +212,15 @@ body {
 .chip-soft {
   background: rgba(142,142,147,0.12);
   color: var(--text-secondary);
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(0,122,255,0.35);
 }
 
 /* Forms & fields */
@@ -434,17 +454,6 @@ small {
   }
 }
 
-/* Badges / tags */
-
-.badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid rgba(0,122,255,0.35);
-}
-
 /* API status */
 
 .api-status-text {
@@ -470,12 +479,7 @@ small {
 
 /* =========================
    Tiles: flights in selected trip
-   (Perplexity-style flight cards)
    ========================= */
-
-.tiles-section {
-  margin-top: 10px;
-}
 
 .tiles-header-row {
   align-items: center;
@@ -487,7 +491,11 @@ small {
   gap: 16px;
 }
 
-/* Flight Tile */
+.tiles-add-row {
+  margin-top: 10px;
+}
+
+/* Perplexity-style flight tile */
 
 .flight-tile {
   max-width: 520px;
