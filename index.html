@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Flight Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f5f7;
+      --card-bg: #ffffff;
+      --border-subtle: rgba(0,0,0,0.07);
+      --text-main: #111111;
+      --text-secondary: #6e6e73;
+      --accent: #007aff;
+      --accent-soft: rgba(0,122,255,0.1);
+      --shadow-soft: 0 12px 30px rgba(0,0,0,0.06);
+      --radius-large: 20px;
+      --radius-medium: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --card-bg: #1c1c1e;
+        --border-subtle: rgba(255,255,255,0.08);
+        --text-main: #f5f5f7;
+        --text-secondary: #a1a1aa;
+        --accent-soft: rgba(10,132,255,0.26);
+        --shadow-soft: 0 22px 40px rgba(0,0,0,0.9);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont,
+        "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #ffffff, var(--bg));
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 20px 56px;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .app-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #0a84ff, #64d2ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 12px 30px rgba(10,132,255,0.35);
+      color: #fff;
+      font-weight: 600;
+      font-size: 22px;
+    }
+
+    .app-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .app-title {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .app-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius-large);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+      padding: 20px 20px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .card-note {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .field-group {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .field-group {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label {
+      font-size: 12px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      font-size: 14px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(120,120,128,0.24);
+      background: rgba(249,249,249,0.9);
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease,
+        background-color 0.15s ease, transform 0.08s ease;
+      -webkit-appearance: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      input,
+      select {
+        background: rgba(44,44,46,0.9);
+        border-color: rgba(99,99,102,0.8);
+      }
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    input::placeholder {
+      color: rgba(128,128,128,0.7);
+    }
+
+    select[multiple] {
+      min-height: 90px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+
+    small {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.08);
+      padding: 7px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f2f2f7;
+      color: var(--text-main);
+      transition: transform 0.08s ease, box-shadow 0.12s ease,
+        background-color 0.12s ease, border-color 0.12s ease;
+      -webkit-appearance: none;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .btn {
+        background: #2c2c2e;
+        border-color: rgba(255,255,255,0.1);
+      }
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0a84ff, #007aff);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 10px 20px rgba(0,122,255,0.4);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: rgba(0,0,0,0.12);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .btn-ghost {
+        border-color: rgba(255,255,255,0.22);
+      }
+    }
+
+    .btn:hover {
+      transform: translateY(-0.5px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+
+    .btn-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .json-block {
+      background: rgba(244,244,248,0.9);
+      border-radius: var(--radius-medium);
+      padding: 10px 12px;
+      border: 1px solid rgba(0,0,0,0.06);
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      overflow: auto;
+      max-height: 260px;
+      white-space: pre;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .json-block {
+        background: #111111;
+        border-color: rgba(255,255,255,0.09);
+      }
+    }
+
+    .json-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .json-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(0,122,255,0.35);
+    }
+
+    .secondary-card {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(0,0,0,0.06);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .secondary-card {
+        border-top-color: rgba(255,255,255,0.12);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-icon">✈︎</div>
+      <div class="app-title-block">
+        <div class="app-title">Flight Log</div>
+        <div class="app-subtitle">
+          Save routes, passengers & PNRs in a clean personal log.
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- LEFT: input + last route -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">New flight</div>
+          <div class="card-note">Enter details and add to your log</div>
+        </div>
+
+        <form id="flight-form">
+          <div class="field-group">
+            <div class="field">
+              <label for="flight-number">Flight Number</label>
+              <input
+                id="flight-number"
+                type="text"
+                placeholder="LH438"
+                autocomplete="off"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label for="flight-date">Flight Date</label>
+              <input
+                id="flight-date"
+                type="date"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="pax-existing">Passenger(s)</label>
+              <select id="pax-existing" multiple></select>
+              <small>Use ⌘ / Ctrl / Shift to select multiple, or leave empty.</small>
+            </div>
+
+            <div class="field">
+              <label for="pax-new">Add New Passenger</label>
+              <input
+                id="pax-new"
+                type="text"
+                placeholder="John Doe, Jane Doe"
+                autocomplete="off"
+              />
+              <small>Comma-separated. New names become selectable next time.</small>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="pnr">PNR Code</label>
+              <input
+                id="pnr"
+                type="text"
+                maxlength="6"
+                placeholder="ABC123"
+                autocomplete="off"
+              />
+              <small>Optional. 6-character booking code.</small>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="btn btn-primary">
+              <span class="btn-icon">➕</span>
+              <span>Get Route & Save</span>
+            </button>
+          </div>
+        </form>
+
+        <div class="secondary-card">
+          <div class="json-label-row">
+            <div class="json-title">Last Fetched Route</div>
+            <span class="badge">Live preview</span>
+          </div>
+          <pre id="output" class="json-block">{}</pre>
+        </div>
+      </section>
+
+      <!-- RIGHT: stored JSON + actions -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">Your log</div>
+          <div class="card-note">Stored privately in this browser</div>
+        </div>
+
+        <div class="button-row" style="margin-bottom: 6px;">
+          <button id="download-json" class="btn btn-ghost">
+            <span class="btn-icon">⬇︎</span>
+            <span>Download JSON</span>
+          </button>
+          <button id="clear-json" class="btn btn-ghost">
+            <span class="btn-icon">🗑</span>
+            <span>Clear All</span>
+          </button>
+        </div>
+
+        <div class="json-label-row" style="margin-top: 10px;">
+          <div class="json-title">Saved Flights</div>
+        </div>
+        <pre id="saved-json" class="json-block">[]</pre>
+      </section>
+    </main>
+  </div>
+
+  <!-- Logic (unchanged) -->
+  <script src="script.js"></script>
+</body>
+</html>
