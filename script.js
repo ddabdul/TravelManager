@@ -320,6 +320,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
 
+  // The submit button we want to enable/disable
+  const submitBtn = form.querySelector('button[type="submit"]');
+
   console.log("Flight Log app script loaded");
 
   let records = loadRecords();
@@ -329,6 +332,47 @@ document.addEventListener("DOMContentLoaded", () => {
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
 
+  // --- Live validation & button enabling ---
+  function hasPassengerSelectedOrNew() {
+    const selectedExisting = Array.from(
+      selectPaxExisting.selectedOptions || []
+    )
+      .map((opt) => opt.value)
+      .filter(Boolean);
+
+    const newRaw = inputPaxNew.value || "";
+    const newNames = newRaw
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+
+    return selectedExisting.length > 0 || newNames.length > 0;
+  }
+
+  function updateSubmitButtonState() {
+    const flightRaw = inputFlight.value.trim();
+    const dateVal = inputDate.value;
+
+    const flightOk = isValidFlightNumber(flightRaw);
+    const dateOk = !!dateVal;
+    const paxOk = hasPassengerSelectedOrNew();
+
+    const allOk = flightOk && dateOk && paxOk;
+
+    submitBtn.disabled = !allOk;
+  }
+
+  // Attach listeners to keep button state in sync
+  inputFlight.addEventListener("input", updateSubmitButtonState);
+  inputDate.addEventListener("input", updateSubmitButtonState);
+  selectPaxExisting.addEventListener("change", updateSubmitButtonState);
+  inputPaxNew.addEventListener("input", updateSubmitButtonState);
+
+  // Initial state (likely disabled)
+  updateSubmitButtonState();
+
+  // --- Form submit ---
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -337,6 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
 
+    // Safety net: in case someone bypasses disabled state
     if (!flightNumberRaw) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter a flight number." },
@@ -361,6 +406,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!flightDate) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter the flight date." },
+        null,
+        2
+      );
+      return;
+    }
+
+    if (!hasPassengerSelectedOrNew()) {
+      outputEl.textContent = JSON.stringify(
+        { error: "Please select or enter at least one passenger." },
         null,
         2
       );
@@ -459,6 +513,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderRecords(records);
       renderPassengerSelect(records);
       inputPaxNew.value = "";
+
+      // Recompute button state (e.g. if you added only new pax, list now has them)
+      updateSubmitButtonState();
     } catch (err) {
       console.error("Error saving record:", err);
       outputEl.textContent = JSON.stringify(
@@ -495,6 +552,9 @@ document.addEventListener("DOMContentLoaded", () => {
       renderRecords(records);
       renderPassengerSelect(records);
       alert("Travel file imported successfully.");
+
+      // After import, re-evaluate state (passengers list changed)
+      updateSubmitButtonState();
     } catch (err) {
       console.error("Import error:", err);
       alert("Could not import file: " + err.message);
@@ -523,5 +583,6 @@ document.addEventListener("DOMContentLoaded", () => {
     saveRecords(records);
     renderRecords(records);
     renderPassengerSelect(records);
+    updateSubmitButtonState();
   });
 });
