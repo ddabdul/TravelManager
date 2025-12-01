@@ -1,7 +1,10 @@
-// Replace with your aviationstack API key
-const API_KEY = "YOUR_API_KEY_HERE"; // <-- put your API key here
+// =========================
+// Config & storage
+// =========================
 
 const STORAGE_KEY = "flightRecords";
+const API_KEY_STORAGE_KEY = "flightLogApiKey";
+let API_KEY = null; // will be loaded from a local file or storage
 
 /**
  * Normalise & deduplicate passenger names:
@@ -55,6 +58,79 @@ function loadRecords() {
  */
 function saveRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records, null, 2));
+}
+
+/**
+ * Load API key from localStorage (if previously saved).
+ */
+function loadApiKeyFromStorage() {
+  try {
+    const key = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (key && typeof key === "string" && key.trim() !== "") {
+      API_KEY = key.trim();
+    }
+  } catch (e) {
+    console.error("Failed to load API key from storage", e);
+  }
+}
+
+/**
+ * Save API key to localStorage for convenience (still only on this device).
+ */
+function saveApiKeyToStorage(key) {
+  try {
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  } catch (e) {
+    console.error("Failed to save API key to storage", e);
+  }
+}
+
+/**
+ * Update small status text under the API key file input.
+ */
+function updateApiKeyStatus(messageOverride) {
+  const statusEl = document.getElementById("api-key-status");
+  if (!statusEl) return;
+
+  if (messageOverride) {
+    statusEl.textContent = messageOverride;
+    return;
+  }
+
+  if (API_KEY) {
+    statusEl.textContent = "API key loaded.";
+  } else {
+    statusEl.textContent = "No API key loaded yet.";
+  }
+}
+
+/**
+ * Read an API key from a user-selected file.
+ * Supports:
+ *  - Plain text: file contains only the key
+ *  - JSON: { "AVIATIONSTACK_API_KEY": "..." } or { "apiKey": "..." }
+ */
+async function loadApiKeyFromFile(file) {
+  const text = await file.text();
+  let key = text.trim();
+
+  // Try JSON first
+  try {
+    const json = JSON.parse(text);
+    if (json && (json.AVIATIONSTACK_API_KEY || json.apiKey)) {
+      key = String(json.AVIATIONSTACK_API_KEY || json.apiKey).trim();
+    }
+  } catch (e) {
+    // Not JSON, that's fine, we treat it as plain text
+  }
+
+  if (!key) {
+    throw new Error("No API key found in file.");
+  }
+
+  API_KEY = key;
+  saveApiKeyToStorage(key);
+  updateApiKeyStatus();
 }
 
 /**
@@ -155,6 +231,10 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
  * Call aviationstack to get the route for a flight number.
  */
 async function fetchRoute(flightNumberRaw) {
+  if (!API_KEY) {
+    throw new Error("API key is not set. Load it from a local file first.");
+  }
+
   // Normalize the flight number: remove spaces & uppercase
   const flightNumber = normalizeFlightNumber(flightNumberRaw);
 
@@ -198,6 +278,10 @@ async function fetchRoute(flightNumberRaw) {
   return route;
 }
 
+// =========================
+// App bootstrap
+// =========================
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("flight-form");
   const outputEl = document.getElementById("output");
@@ -208,10 +292,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputPnr = document.getElementById("pnr");
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
+  const apiKeyFileInput = document.getElementById("api-key-file");
 
   let records = loadRecords();
   renderRecords(records);
   renderPassengerSelect(records);
+
+  // Load any previously stored API key
+  loadApiKeyFromStorage();
+  updateApiKeyStatus();
+
+  // When user selects a local file containing the API key
+  if (apiKeyFileInput) {
+    apiKeyFileInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      updateApiKeyStatus("Reading API key from file...");
+      try {
+        await loadApiKeyFromFile(file);
+      } catch (err) {
+        console.error(err);
+        updateApiKeyStatus("Error loading API key: " + err.message);
+      }
+    });
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -243,37 +347,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let route;
 
-    if (cachedRoute) {
-      // Build a human-friendly summary of the cached route for the confirm dialog
-      const depAirport =
-        (cachedRoute.departure && cachedRoute.departure.airport) || "";
-      const depIata =
-        (cachedRoute.departure && cachedRoute.departure.iata) || "";
-      const arrAirport =
-        (cachedRoute.arrival && cachedRoute.arrival.airport) || "";
-      const arrIata =
-        (cachedRoute.arrival && cachedRoute.arrival.iata) || "";
-      const routeSummary = `${depAirport} (${depIata}) → ${arrAirport} (${arrIata})`;
+    try {
+      if (cachedRoute) {
+        // Build a human-friendly summary of the cached route for the confirm dialog
+        const depAirport =
+          (cachedRoute.departure && cachedRoute.departure.airport) || "";
+        const depIata =
+          (cachedRoute.departure && cachedRoute.departure.iata) || "";
+        const arrAirport =
+          (cachedRoute.arrival && cachedRoute.arrival.airport) || "";
+        const arrIata =
+          (cachedRoute.arrival && cachedRoute.arrival.iata) || "";
+        const routeSummary = `${depAirport} (${depIata}) → ${arrAirport} (${arrIata})`;
 
-      const msg =
-        `A saved route already exists for flight ${normalizeFlightNumber(
-          flightNumber
-        )}.\n\n` +
-        `${routeSummary}\n\n` +
-        "Use this existing route (no API call)?\n\n" +
-        "OK = Use cached route\nCancel = Call the API again";
+        const msg =
+          `A saved route already exists for flight ${normalizeFlightNumber(
+            flightNumber
+          )}.\n\n` +
+          `${routeSummary}\n\n` +
+          "Use this existing route (no API call)?\n\n" +
+          "OK = Use cached route\nCancel = Call the API again";
 
-      const useCached = window.confirm(msg);
+        const useCached = window.confirm(msg);
 
-      if (useCached) {
-        route = cachedRoute;
-        outputEl.textContent = JSON.stringify(
-          { ...route, _source: "cache" },
-          null,
-          2
-        );
+        if (useCached) {
+          route = cachedRoute;
+          outputEl.textContent = JSON.stringify(
+            { ...route, _source: "cache" },
+            null,
+            2
+          );
+        } else {
+          // Proceed with API call
+          outputEl.textContent = JSON.stringify(
+            { status: "Loading route from API..." },
+            null,
+            2
+          );
+          route = await fetchRoute(flightNumber);
+          outputEl.textContent = JSON.stringify(route, null, 2);
+        }
       } else {
-        // Proceed with API call
+        // No cached route: go straight to API
         outputEl.textContent = JSON.stringify(
           { status: "Loading route from API..." },
           null,
@@ -282,15 +397,9 @@ document.addEventListener("DOMContentLoaded", () => {
         route = await fetchRoute(flightNumber);
         outputEl.textContent = JSON.stringify(route, null, 2);
       }
-    } else {
-      // No cached route: go straight to API
-      outputEl.textContent = JSON.stringify(
-        { status: "Loading route from API..." },
-        null,
-        2
-      );
-      route = await fetchRoute(flightNumber);
-      outputEl.textContent = JSON.stringify(route, null, 2);
+    } catch (err) {
+      outputEl.textContent = JSON.stringify({ error: err.message }, null, 2);
+      return;
     }
 
     try {
