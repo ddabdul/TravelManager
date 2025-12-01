@@ -320,7 +320,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
 
-  // The submit button we want to enable/disable
+  // Error elements
+  const flightErrorEl = document.getElementById("flight-error");
+  const dateErrorEl = document.getElementById("flight-date-error");
+  const paxErrorEl = document.getElementById("pax-error");
+
+  // Submit button we want to enable/disable
   const submitBtn = form.querySelector('button[type="submit"]');
 
   console.log("Flight Log app script loaded");
@@ -359,7 +364,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const allOk = flightOk && dateOk && paxOk;
 
+    // Button enabled/disabled
     submitBtn.disabled = !allOk;
+
+    // Subtle inline errors
+    if (flightErrorEl) {
+      flightErrorEl.textContent =
+        flightRaw && !flightOk
+          ? "Use format like LH438 or BA 2785."
+          : "";
+    }
+
+    if (dateErrorEl) {
+      dateErrorEl.textContent =
+        !dateOk && (flightRaw || paxOk)
+          ? "Select a flight date."
+          : "";
+    }
+
+    if (paxErrorEl) {
+      paxErrorEl.textContent =
+        !paxOk && (flightRaw || dateOk)
+          ? "Add or select at least one passenger."
+          : "";
+    }
   }
 
   // Attach listeners to keep button state in sync
@@ -372,7 +400,6 @@ document.addEventListener("DOMContentLoaded", () => {
   updateSubmitButtonState();
 
   // --- Form submit ---
-
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -381,7 +408,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
 
-    // Safety net: in case someone bypasses disabled state
+    // Safety net (in case someone bypasses disabled state)
     if (!flightNumberRaw) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter a flight number." },
@@ -514,7 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPassengerSelect(records);
       inputPaxNew.value = "";
 
-      // Recompute button state (e.g. if you added only new pax, list now has them)
+      // Recompute button state (e.g. passengers list changed)
       updateSubmitButtonState();
     } catch (err) {
       console.error("Error saving record:", err);
