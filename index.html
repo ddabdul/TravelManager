@@ -19,14 +19,100 @@
     </header>
 
     <main class="layout">
-      <!-- LEFT: input + last route -->
-      <section class="card">
+      <!-- TOP: Trip selection & overview -->
+      <section class="card card-trip">
+        <div class="card-header">
+          <div class="card-title">Trip</div>
+          <div class="card-note">Step 1 – choose or create a trip</div>
+        </div>
+
+        <!-- Trip selection / creation controls -->
+        <div class="field-group">
+          <div class="field">
+            <label for="trip-existing">Existing Trip</label>
+            <select id="trip-existing"></select>
+            <small>Select an existing trip, or leave on “New trip” and name one below.</small>
+          </div>
+
+          <div class="field">
+            <label for="trip-new-name">New Trip Name</label>
+            <input
+              id="trip-new-name"
+              type="text"
+              placeholder="Summer 2026 in Greece"
+              autocomplete="off"
+            />
+            <small>If filled, a new trip will be created.</small>
+          </div>
+        </div>
+
+        <div id="trip-error" class="field-error" aria-live="polite"></div>
+
+        <!-- API key + data actions -->
+        <div class="trip-actions-row">
+          <div class="api-status-row">
+            <span id="api-key-status" class="api-status-text">
+              Checking API key…
+            </span>
+          </div>
+
+          <div class="button-row trip-button-row">
+            <button id="import-json" class="btn btn-ghost">
+              <span class="btn-icon">⬆︎</span>
+              <span>Import JSON</span>
+            </button>
+            <button id="download-json" class="btn btn-ghost">
+              <span class="btn-icon">⬇︎</span>
+              <span>Download JSON</span>
+            </button>
+            <button id="clear-json" class="btn btn-ghost">
+              <span class="btn-icon">🗑</span>
+              <span>Clear All</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Hidden file input for import -->
+        <input
+          id="import-json-file"
+          type="file"
+          accept="application/json"
+          style="display:none;"
+        />
+
+        <!-- Flights in selected trip (tiles) -->
+        <div class="tiles-section">
+          <div class="tiles-header-row">
+            <div class="tiles-title">Flights in this trip</div>
+            <span id="trip-flights-summary" class="tag-soft">
+              No trip selected
+            </span>
+          </div>
+          <div id="trip-flights-list" class="tiles-grid">
+            <div class="tiles-empty">
+              Select an existing trip or create a new one to see its flights here.
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw JSON view of all trips -->
+        <div class="secondary-card secondary-card-json">
+          <div class="json-label-row">
+            <div class="json-title">All Trips (raw JSON)</div>
+          </div>
+          <pre id="saved-json" class="json-block">[]</pre>
+        </div>
+      </section>
+
+      <!-- BOTTOM: Flight entry -->
+      <section class="card card-flight">
         <div class="card-header">
           <div class="card-title">New flight</div>
-          <div class="card-note">Enter details and add to a trip</div>
+          <div class="card-note">Step 2 – add a flight to the selected trip</div>
         </div>
 
         <form id="flight-form">
+          <!-- Flight info -->
           <div class="field-group">
             <div class="field">
               <label for="flight-number">Flight Number</label>
@@ -51,6 +137,7 @@
             </div>
           </div>
 
+          <!-- Passengers -->
           <div class="field-group">
             <div class="field">
               <label for="pax-existing">Passenger(s)</label>
@@ -72,28 +159,7 @@
 
           <div id="pax-error" class="field-error" aria-live="polite"></div>
 
-          <!-- Trip selection / creation -->
-          <div class="field-group">
-            <div class="field">
-              <label for="trip-existing">Trip</label>
-              <select id="trip-existing"></select>
-              <small>Select an existing trip, or leave empty and name a new trip.</small>
-            </div>
-
-            <div class="field">
-              <label for="trip-new-name">New Trip Name</label>
-              <input
-                id="trip-new-name"
-                type="text"
-                placeholder="Summer 2026 in Greece"
-                autocomplete="off"
-              />
-              <small>If filled, a new trip will be created.</small>
-            </div>
-          </div>
-
-          <div id="trip-error" class="field-error" aria-live="polite"></div>
-
+          <!-- PNR -->
           <div class="field-group">
             <div class="field">
               <label for="pnr">PNR Code</label>
@@ -108,14 +174,16 @@
             </div>
           </div>
 
+          <!-- Submit -->
           <div class="button-row">
             <button type="submit" class="btn btn-primary" disabled>
               <span class="btn-icon">➕</span>
-              <span>Get Route & Save</span>
+              <span>Get Route &amp; Save</span>
             </button>
           </div>
         </form>
 
+        <!-- Last fetched route -->
         <div class="secondary-card">
           <div class="json-label-row">
             <div class="json-title">Last Fetched Route</div>
@@ -123,49 +191,6 @@
           </div>
           <pre id="output" class="json-block">{}</pre>
         </div>
-      </section>
-
-      <!-- RIGHT: stored JSON + actions -->
-      <section class="card">
-        <div class="card-header">
-          <div class="card-title">Your trips</div>
-          <div class="card-note">Stored privately in this browser</div>
-        </div>
-
-        <!-- API key status -->
-        <div class="api-status-row">
-          <span id="api-key-status" class="api-status-text">
-            Checking API key…
-          </span>
-        </div>
-
-        <div class="button-row button-row-top">
-          <button id="import-json" class="btn btn-ghost">
-            <span class="btn-icon">⬆︎</span>
-            <span>Import JSON</span>
-          </button>
-          <button id="download-json" class="btn btn-ghost">
-            <span class="btn-icon">⬇︎</span>
-            <span>Download JSON</span>
-          </button>
-          <button id="clear-json" class="btn btn-ghost">
-            <span class="btn-icon">🗑</span>
-            <span>Clear All</span>
-          </button>
-        </div>
-
-        <!-- Hidden file input for import -->
-        <input
-          id="import-json-file"
-          type="file"
-          accept="application/json"
-          style="display:none;"
-        />
-
-        <div class="json-label-row">
-          <div class="json-title">Saved Trips & Flights</div>
-        </div>
-        <pre id="saved-json" class="json-block">[]</pre>
       </section>
     </main>
   </div>
