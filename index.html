@@ -432,7 +432,7 @@
           <div class="card-note">Stored privately in this browser</div>
         </div>
 
-        <!-- API key status (no file input) -->
+        <!-- API key status -->
         <div class="api-status-row">
           <span id="api-key-status" class="api-status-text">
             Checking API key…
@@ -440,6 +440,10 @@
         </div>
 
         <div class="button-row" style="margin-bottom: 6px;">
+          <button id="import-json" class="btn btn-ghost">
+            <span class="btn-icon">⬆︎</span>
+            <span>Import JSON</span>
+          </button>
           <button id="download-json" class="btn btn-ghost">
             <span class="btn-icon">⬇︎</span>
             <span>Download JSON</span>
@@ -449,6 +453,14 @@
             <span>Clear All</span>
           </button>
         </div>
+
+        <!-- Hidden file input for import -->
+        <input
+          id="import-json-file"
+          type="file"
+          accept="application/json"
+          style="display:none;"
+        />
 
         <div class="json-label-row" style="margin-top: 10px;">
           <div class="json-title">Saved Flights</div>
