@@ -3,16 +3,10 @@
 // =========================
 
 const STORAGE_KEY = "flightRecords";
-let API_KEY = null; // will be loaded from config.json or manual file
+let API_KEY = null; // will be loaded from config.json
 
-/**
- * Normalise & deduplicate passenger names:
- * - trim
- * - collapse multiple spaces
- * - dedupe ignoring case (John Doe == john doe)
- */
 function normalizePassengerNames(names) {
-  const map = new Map(); // key = lowercased name, value = first "nice" version
+  const map = new Map();
 
   for (const raw of names) {
     if (!raw || typeof raw !== "string") continue;
@@ -24,22 +18,14 @@ function normalizePassengerNames(names) {
       map.set(key, cleaned);
     }
   }
-
   return Array.from(map.values());
 }
 
-/**
- * Normalize flight number: remove spaces, uppercase.
- * e.g. "lh 438" -> "LH438"
- */
 function normalizeFlightNumber(flightNumber) {
   if (!flightNumber || typeof flightNumber !== "string") return "";
   return flightNumber.replace(/\s+/g, "").toUpperCase();
 }
 
-/**
- * Load all saved flight records from localStorage.
- */
 function loadRecords() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -52,133 +38,73 @@ function loadRecords() {
   }
 }
 
-/**
- * Save all flight records to localStorage.
- */
 function saveRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records, null, 2));
 }
 
-/**
- * Update small status text under the API key file input.
- */
 function updateApiKeyStatus(messageOverride) {
   const statusEl = document.getElementById("api-key-status");
   if (!statusEl) return;
-
-  if (messageOverride) {
-    statusEl.textContent = messageOverride;
-    return;
-  }
-
-  if (API_KEY) {
-    statusEl.textContent = "API key loaded.";
-  } else {
-    statusEl.textContent = "No API key loaded yet.";
-  }
+  statusEl.textContent = messageOverride || (API_KEY ? "API key loaded." : "No API key loaded yet.");
 }
 
 /**
  * Try to load API key automatically from config.json
- * File must be in same folder as index.html/script.js.
  */
 async function loadApiKeyFromConfigJson() {
   try {
+    console.log("Attempting to load config.json…");
     const res = await fetch("config.json", { cache: "no-store" });
     if (!res.ok) {
-      console.warn("config.json not found or not readable:", res.status);
-      updateApiKeyStatus("No API key loaded yet (config.json not found).");
+      console.warn("config.json not found or not readable, status:", res.status);
+      updateApiKeyStatus("config.json not found (status " + res.status + ").");
       return;
     }
 
     const cfg = await res.json();
+    console.log("config.json loaded:", cfg);
+
     const key = (
       (cfg && (cfg.AVIATIONSTACK_API_KEY || cfg.apiKey)) ||
       ""
     ).trim();
 
     if (!key) {
-      console.warn("config.json loaded but no key field found.");
+      console.warn("config.json loaded but no AVIATIONSTACK_API_KEY/apiKey field.");
       updateApiKeyStatus("config.json found but no key inside.");
       return;
     }
 
     API_KEY = key;
+    console.log("API key set from config.json");
     updateApiKeyStatus("API key loaded from config.json.");
-    console.log("API key loaded from config.json");
   } catch (e) {
     console.error("Error reading config.json:", e);
     updateApiKeyStatus("Could not read config.json.");
   }
 }
 
-/**
- * Read an API key from a user-selected file (fallback).
- * Supports:
- *  - Plain text: file contains only the key
- *  - JSON: { "AVIATIONSTACK_API_KEY": "..." } or { "apiKey": "..." }
- */
-async function loadApiKeyFromFile(file) {
-  const text = await file.text();
-  let key = text.trim();
-
-  // Try JSON first
-  try {
-    const json = JSON.parse(text);
-    if (json && (json.AVIATIONSTACK_API_KEY || json.apiKey)) {
-      key = String(json.AVIATIONSTACK_API_KEY || json.apiKey).trim();
-    }
-  } catch (e) {
-    // Not JSON, that's fine, we treat it as plain text
-  }
-
-  if (!key) {
-    throw new Error("No API key found in file.");
-  }
-
-  API_KEY = key;
-  updateApiKeyStatus("API key loaded from selected file.");
-}
-
-/**
- * Show the full JSON in the <pre>.
- */
 function renderRecords(records) {
   const savedEl = document.getElementById("saved-json");
   savedEl.textContent = JSON.stringify(records, null, 2);
 }
 
-/**
- * Build a unique, sorted list of passenger names from all records.
- * A passenger appearing in many records will only appear once.
- */
 function getPassengerList(records) {
-  // Collect all names from all records
   const allNames = [];
   for (const rec of records) {
     if (Array.isArray(rec.paxNames)) {
       allNames.push(...rec.paxNames);
     }
   }
-
-  // Normalise & dedupe across all records
   const unique = normalizePassengerNames(allNames);
-
-  // Sort alphabetically
   unique.sort((a, b) => a.localeCompare(b));
-
   return unique;
 }
 
-/**
- * Render passenger names into the <select multiple>.
- * Ensures each name appears only once.
- */
 function renderPassengerSelect(records) {
   const select = document.getElementById("pax-existing");
   const passengers = getPassengerList(records);
 
-  // Clear existing options
   select.innerHTML = "";
 
   if (passengers.length === 0) {
@@ -200,11 +126,6 @@ function renderPassengerSelect(records) {
   });
 }
 
-/**
- * Look for an existing route for this flight in the saved records.
- * First try exact match on (normalized flight number + same date),
- * then fall back to any record with the same flight number.
- */
 function findCachedRoute(records, flightNumberRaw, flightDate) {
   const normTarget = normalizeFlightNumber(flightNumberRaw);
   if (!normTarget) return null;
@@ -220,12 +141,10 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
 
     if (!normRec || normRec !== normTarget) continue;
 
-    // Perfect match: same flight number + same date
     if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
       return rec.route;
     }
 
-    // Remember at least one route for this flight number
     if (!fallbackRoute) {
       fallbackRoute = rec.route;
     }
@@ -234,22 +153,20 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
   return fallbackRoute;
 }
 
-/**
- * Call aviationstack to get the route for a flight number.
- */
 async function fetchRoute(flightNumberRaw) {
   if (!API_KEY) {
     throw new Error(
-      "API key is not set. Ensure config.json is present or load a key file."
+      "API key is not set. Ensure config.json is present and loaded."
     );
   }
 
-  // Normalize the flight number: remove spaces & uppercase
   const flightNumber = normalizeFlightNumber(flightNumberRaw);
 
   const url = new URL("https://api.aviationstack.com/v1/flights");
   url.searchParams.set("access_key", API_KEY);
   url.searchParams.set("flight_iata", flightNumber);
+
+  console.log("Calling API:", url.toString());
 
   const response = await fetch(url.toString());
   if (!response.ok) {
@@ -257,12 +174,12 @@ async function fetchRoute(flightNumberRaw) {
   }
 
   const data = await response.json();
+  console.log("API response:", data);
 
   if (!data || !Array.isArray(data.data) || data.data.length === 0) {
     throw new Error("No flight found for " + flightNumber);
   }
 
-  // Take the first matching flight
   const flight = data.data[0];
 
   const route = {
@@ -301,38 +218,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputPnr = document.getElementById("pnr");
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
-  const apiKeyFileInput = document.getElementById("api-key-file");
 
   let records = loadRecords();
   renderRecords(records);
   renderPassengerSelect(records);
 
-  // Initial status
-  updateApiKeyStatus("Loading API key from config.json...");
-
-  // Try to load API key automatically from config.json
+  updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
-
-  // Optional: manual file-based key loading (fallback)
-  if (apiKeyFileInput) {
-    apiKeyFileInput.addEventListener("change", async (event) => {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      updateApiKeyStatus("Reading API key from selected file...");
-      try {
-        await loadApiKeyFromFile(file);
-      } catch (err) {
-        console.error(err);
-        updateApiKeyStatus("Error loading API key: " + err.message);
-      }
-    });
-  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const flightNumber = inputFlight.value.trim();
-    const flightDate = inputDate.value; // YYYY-MM-DD
+    const flightDate = inputDate.value;
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
 
@@ -353,14 +251,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 1) Try to find a cached route in existing records
     const cachedRoute = findCachedRoute(records, flightNumber, flightDate);
-
     let route;
 
     try {
       if (cachedRoute) {
-        // Build a human-friendly summary of the cached route for the confirm dialog
         const depAirport =
           (cachedRoute.departure && cachedRoute.departure.airport) || "";
         const depIata =
@@ -389,7 +284,6 @@ document.addEventListener("DOMContentLoaded", () => {
             2
           );
         } else {
-          // Proceed with API call
           outputEl.textContent = JSON.stringify(
             { status: "Loading route from API..." },
             null,
@@ -399,7 +293,6 @@ document.addEventListener("DOMContentLoaded", () => {
           outputEl.textContent = JSON.stringify(route, null, 2);
         }
       } else {
-        // No cached route: go straight to API
         outputEl.textContent = JSON.stringify(
           { status: "Loading route from API..." },
           null,
@@ -409,19 +302,18 @@ document.addEventListener("DOMContentLoaded", () => {
         outputEl.textContent = JSON.stringify(route, null, 2);
       }
     } catch (err) {
+      console.error("Error during route lookup:", err);
       outputEl.textContent = JSON.stringify({ error: err.message }, null, 2);
       return;
     }
 
     try {
-      // Existing passenger selections
       const selectedExisting = Array.from(
         selectPaxExisting.selectedOptions || []
       )
         .map((opt) => opt.value)
         .filter(Boolean);
 
-      // New passenger names (comma-separated)
       const newNames = paxNewRaw
         ? paxNewRaw
             .split(",")
@@ -429,16 +321,15 @@ document.addEventListener("DOMContentLoaded", () => {
             .filter(Boolean)
         : [];
 
-      // Merge + normalise + dedupe for THIS record
       const paxNames = normalizePassengerNames([
         ...selectedExisting,
         ...newNames
       ]);
 
       const record = {
-        id: Date.now(), // simple unique id
+        id: Date.now(),
         createdAt: new Date().toISOString(),
-        flightDate: flightDate, // as given by the date input
+        flightDate: flightDate,
         pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
         paxNames: paxNames,
         route: route
@@ -447,12 +338,10 @@ document.addEventListener("DOMContentLoaded", () => {
       records.push(record);
       saveRecords(records);
       renderRecords(records);
-      renderPassengerSelect(records); // updates global list, keeping each name once
-
-      // Optional: clear only the "new pax" field, keep selections
+      renderPassengerSelect(records);
       inputPaxNew.value = "";
     } catch (err) {
-      // If something fails after we already printed the route, show the error too
+      console.error("Error saving record:", err);
       outputEl.textContent = JSON.stringify(
         { error: err.message },
         null,
