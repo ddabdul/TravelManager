@@ -2,7 +2,7 @@
 // Config & storage
 // =========================
 
-const STORAGE_KEY = "flightRecords";
+const STORAGE_KEY = "flightTrips"; // new key: trips-based model
 let API_KEY = null; // will be loaded from config.json
 
 function normalizePassengerNames(names) {
@@ -40,20 +40,22 @@ function isValidFlightNumber(input) {
   return pattern.test(trimmed);
 }
 
-function loadRecords() {
+// ---- Trips storage ----
+
+function loadTrips() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    console.error("Failed to parse stored records", e);
+    console.error("Failed to parse stored trips", e);
     return [];
   }
 }
 
-function saveRecords(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records, null, 2));
+function saveTrips(trips) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trips, null, 2));
 }
 
 function updateApiKeyStatus(messageOverride) {
@@ -99,16 +101,21 @@ async function loadApiKeyFromConfigJson() {
   }
 }
 
-function renderRecords(records) {
+// ---- Rendering helpers ----
+
+function renderTrips(trips) {
   const savedEl = document.getElementById("saved-json");
-  savedEl.textContent = JSON.stringify(records, null, 2);
+  savedEl.textContent = JSON.stringify(trips, null, 2);
 }
 
-function getPassengerList(records) {
+function getPassengerList(trips) {
   const allNames = [];
-  for (const rec of records) {
-    if (Array.isArray(rec.paxNames)) {
-      allNames.push(...rec.paxNames);
+  for (const trip of trips) {
+    if (!trip || !Array.isArray(trip.records)) continue;
+    for (const rec of trip.records) {
+      if (Array.isArray(rec.paxNames)) {
+        allNames.push(...rec.paxNames);
+      }
     }
   }
   const unique = normalizePassengerNames(allNames);
@@ -116,9 +123,9 @@ function getPassengerList(records) {
   return unique;
 }
 
-function renderPassengerSelect(records) {
+function renderPassengerSelect(trips) {
   const select = document.getElementById("pax-existing");
-  const passengers = getPassengerList(records);
+  const passengers = getPassengerList(trips);
 
   select.innerHTML = "";
 
@@ -141,28 +148,63 @@ function renderPassengerSelect(records) {
   });
 }
 
-function findCachedRoute(records, flightNumberRaw, flightDate) {
+function renderTripSelect(trips) {
+  const select = document.getElementById("trip-existing");
+  if (!select) return;
+
+  select.innerHTML = "";
+
+  if (!trips || trips.length === 0) {
+    const opt = document.createElement("option");
+    opt.textContent = "No trips yet – name one below.";
+    opt.disabled = true;
+    select.appendChild(opt);
+    select.disabled = true;
+    return;
+  }
+
+  select.disabled = false;
+
+  trips.forEach((trip) => {
+    const opt = document.createElement("option");
+    opt.value = String(trip.id);
+    const dateLabel = trip.createdAt
+      ? new Date(trip.createdAt).toISOString().slice(0, 10)
+      : "";
+    opt.textContent = dateLabel
+      ? `${trip.name} (${dateLabel})`
+      : trip.name;
+    select.appendChild(opt);
+  });
+}
+
+// ---- Route caching ----
+
+function findCachedRoute(trips, flightNumberRaw, flightDate) {
   const normTarget = normalizeFlightNumber(flightNumberRaw);
   if (!normTarget) return null;
 
   let fallbackRoute = null;
 
-  for (const rec of records) {
-    if (!rec || !rec.route) continue;
+  for (const trip of trips) {
+    if (!trip || !Array.isArray(trip.records)) continue;
+    for (const rec of trip.records) {
+      if (!rec || !rec.route) continue;
 
-    const recFlightNum =
-      (rec.route.flightNumber && String(rec.route.flightNumber)) || "";
-    const normRec = normalizeFlightNumber(recFlightNum);
+      const recFlightNum =
+        (rec.route.flightNumber && String(rec.route.flightNumber)) || "";
+      const normRec = normalizeFlightNumber(recFlightNum);
 
-    if (!normRec || normRec !== normTarget) continue;
+      if (!normRec || normRec !== normTarget) continue;
 
-    // Exact same date
-    if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
-      return rec.route;
-    }
+      // Exact same date
+      if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
+        return rec.route;
+      }
 
-    if (!fallbackRoute) {
-      fallbackRoute = rec.route;
+      if (!fallbackRoute) {
+        fallbackRoute = rec.route;
+      }
     }
   }
 
@@ -283,10 +325,10 @@ function adjustRouteDatesToFlightDate(route, flightDate) {
 }
 
 /**
- * Import records from a JSON file.
- * The file must contain an array of record objects.
+ * Import trips from a JSON file.
+ * The file must contain an array of trip objects.
  */
-async function importRecordsFromFile(file) {
+async function importTripsFromFile(file) {
   const text = await file.text();
   let parsed;
   try {
@@ -296,7 +338,7 @@ async function importRecordsFromFile(file) {
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("Expected an array of records in the JSON (array).");
+    throw new Error("Expected an array of trips in the JSON (array).");
   }
 
   return parsed;
@@ -315,6 +357,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const inputPaxNew = document.getElementById("pax-new");
   const inputPnr = document.getElementById("pnr");
 
+  const selectTripExisting = document.getElementById("trip-existing");
+  const inputTripNew = document.getElementById("trip-new-name");
+
   const importBtn = document.getElementById("import-json");
   const importFileInput = document.getElementById("import-json-file");
   const downloadBtn = document.getElementById("download-json");
@@ -324,15 +369,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const flightErrorEl = document.getElementById("flight-error");
   const dateErrorEl = document.getElementById("flight-date-error");
   const paxErrorEl = document.getElementById("pax-error");
+  const tripErrorEl = document.getElementById("trip-error");
 
   // Submit button we want to enable/disable
   const submitBtn = form.querySelector('button[type="submit"]');
 
-  console.log("Flight Log app script loaded");
+  console.log("Flight Log app script loaded (with trips)");
 
-  let records = loadRecords();
-  renderRecords(records);
-  renderPassengerSelect(records);
+  let trips = loadTrips();
+  renderTrips(trips);
+  renderPassengerSelect(trips);
+  renderTripSelect(trips);
 
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
@@ -354,6 +401,24 @@ document.addEventListener("DOMContentLoaded", () => {
     return selectedExisting.length > 0 || newNames.length > 0;
   }
 
+  function hasValidTripSelection() {
+    const selectedTripId =
+      !selectTripExisting.disabled && selectTripExisting.value
+        ? selectTripExisting.value
+        : "";
+    const newTripName = (inputTripNew.value || "").trim();
+
+    if (!selectedTripId && !newTripName) {
+      // nothing chosen
+      return false;
+    }
+    if (selectedTripId && newTripName) {
+      // both chosen (not allowed)
+      return false;
+    }
+    return true;
+  }
+
   function updateSubmitButtonState() {
     const flightRaw = inputFlight.value.trim();
     const dateVal = inputDate.value;
@@ -361,8 +426,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const flightOk = isValidFlightNumber(flightRaw);
     const dateOk = !!dateVal;
     const paxOk = hasPassengerSelectedOrNew();
+    const tripOk = hasValidTripSelection();
 
-    const allOk = flightOk && dateOk && paxOk;
+    const allOk = flightOk && dateOk && paxOk && tripOk;
 
     // Button enabled/disabled
     submitBtn.disabled = !allOk;
@@ -377,16 +443,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (dateErrorEl) {
       dateErrorEl.textContent =
-        !dateOk && (flightRaw || paxOk)
+        !dateOk && (flightRaw || paxOk || hasValidTripSelection())
           ? "Select a flight date."
           : "";
     }
 
     if (paxErrorEl) {
       paxErrorEl.textContent =
-        !paxOk && (flightRaw || dateOk)
+        !paxOk && (flightRaw || dateOk || hasValidTripSelection())
           ? "Add or select at least one passenger."
           : "";
+    }
+
+    if (tripErrorEl) {
+      const selectedTripId =
+        !selectTripExisting.disabled && selectTripExisting.value
+          ? selectTripExisting.value
+          : "";
+      const newTripName = (inputTripNew.value || "").trim();
+
+      if (!selectedTripId && !newTripName) {
+        tripErrorEl.textContent =
+          (flightRaw || dateOk || paxOk)
+            ? "Select an existing trip or enter a new trip name."
+            : "";
+      } else if (selectedTripId && newTripName) {
+        tripErrorEl.textContent =
+          "Choose either an existing trip OR a new trip name, not both.";
+      } else {
+        tripErrorEl.textContent = "";
+      }
     }
   }
 
@@ -395,6 +481,8 @@ document.addEventListener("DOMContentLoaded", () => {
   inputDate.addEventListener("input", updateSubmitButtonState);
   selectPaxExisting.addEventListener("change", updateSubmitButtonState);
   inputPaxNew.addEventListener("input", updateSubmitButtonState);
+  selectTripExisting.addEventListener("change", updateSubmitButtonState);
+  inputTripNew.addEventListener("input", updateSubmitButtonState);
 
   // Initial state (likely disabled)
   updateSubmitButtonState();
@@ -407,8 +495,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const flightDate = inputDate.value;
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
+    const newTripName = (inputTripNew.value || "").trim();
+    const selectedTripId =
+      !selectTripExisting.disabled && selectTripExisting.value
+        ? selectTripExisting.value
+        : "";
 
-    // Safety net (in case someone bypasses disabled state)
+    // Safety net validations
     if (!flightNumberRaw) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter a flight number." },
@@ -448,8 +541,20 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (!hasValidTripSelection()) {
+      outputEl.textContent = JSON.stringify(
+        {
+          error:
+            "You must either select an existing trip OR enter a new trip name (but not both)."
+        },
+        null,
+        2
+      );
+      return;
+    }
+
     const flightNumber = flightNumberRaw; // keep original spacing for display
-    const cachedRoute = findCachedRoute(records, flightNumber, flightDate);
+    const cachedRoute = findCachedRoute(trips, flightNumber, flightDate);
     let route;
 
     try {
@@ -508,7 +613,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const selectedExisting = Array.from(
+      const selectedExistingPax = Array.from(
         selectPaxExisting.selectedOptions || []
       )
         .map((opt) => opt.value)
@@ -522,7 +627,7 @@ document.addEventListener("DOMContentLoaded", () => {
         : [];
 
       const paxNames = normalizePassengerNames([
-        ...selectedExisting,
+        ...selectedExistingPax,
         ...newNames
       ]);
 
@@ -535,13 +640,43 @@ document.addEventListener("DOMContentLoaded", () => {
         route: route
       };
 
-      // Save to in-memory and localStorage
-      records.push(record);
-      saveRecords(records);
-      renderRecords(records);
-      renderPassengerSelect(records);
+      // Determine trip to attach to
+      let tripToUse = null;
 
-      // ---- NEW: clear all form fields after save ----
+      if (newTripName && !selectedTripId) {
+        // create new trip
+        tripToUse = {
+          id: Date.now(),
+          name: newTripName,
+          createdAt: new Date().toISOString(),
+          records: []
+        };
+        trips.push(tripToUse);
+      } else if (!newTripName && selectedTripId) {
+        // use existing trip
+        tripToUse = trips.find((t) => String(t.id) === String(selectedTripId));
+        if (!tripToUse) {
+          throw new Error("Selected trip not found.");
+        }
+      } else {
+        // Should not happen if validations are correct
+        throw new Error(
+          "Trip selection invalid. Please select a trip or enter a new name."
+        );
+      }
+
+      tripToUse.records.push(record);
+      saveTrips(trips);
+      renderTrips(trips);
+      renderPassengerSelect(trips);
+      renderTripSelect(trips);
+
+      // If we just created a new trip, select it in the dropdown
+      if (newTripName && tripToUse && selectTripExisting && !selectTripExisting.disabled) {
+        selectTripExisting.value = String(tripToUse.id);
+      }
+
+      // ---- Clear per-record fields after save (keep the trip selection) ----
       inputFlight.value = "";
       inputDate.value = "";
       inputPnr.value = "";
@@ -550,11 +685,13 @@ document.addEventListener("DOMContentLoaded", () => {
       Array.from(selectPaxExisting.options).forEach((opt) => {
         opt.selected = false;
       });
+      // Clear new trip name field
+      inputTripNew.value = "";
 
       // Recompute button + errors after clearing
       updateSubmitButtonState();
 
-      // ---- NEW: alert showing what was saved ----
+      // ---- Alert showing what was saved ----
       const flightLabel =
         (record.route && record.route.flightNumber) || flightNumber;
       const depIata =
@@ -572,7 +709,8 @@ document.addEventListener("DOMContentLoaded", () => {
           : "None";
 
       let alertMsg =
-        `Saved flight ${flightLabel}${routeLabel}\n` +
+        `Saved to trip: ${tripToUse.name}\n` +
+        `Flight: ${flightLabel}${routeLabel}\n` +
         `Date: ${record.flightDate}\n` +
         `Passengers: ${paxList}`;
 
@@ -604,22 +742,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!file) return;
 
     try {
-      const importedRecords = await importRecordsFromFile(file);
+      const importedTrips = await importTripsFromFile(file);
 
       const useImported = window.confirm(
-        "Replace current log with data from this file?"
+        "Replace current trips with data from this file?"
       );
       if (!useImported) {
         return;
       }
 
-      records = importedRecords;
-      saveRecords(records);
-      renderRecords(records);
-      renderPassengerSelect(records);
-      alert("Travel file imported successfully.");
+      trips = importedTrips;
+      saveTrips(trips);
+      renderTrips(trips);
+      renderPassengerSelect(trips);
+      renderTripSelect(trips);
+      alert("Trips file imported successfully.");
 
-      // After import, re-evaluate state (passengers list changed)
+      // After import, re-evaluate state (passengers & trips changed)
       updateSubmitButtonState();
     } catch (err) {
       console.error("Import error:", err);
@@ -629,13 +768,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Download JSON
   downloadBtn.addEventListener("click", () => {
-    const dataStr = JSON.stringify(records, null, 2);
+    const dataStr = JSON.stringify(trips, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "flights.json";
+    a.download = "trips.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -644,11 +783,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Clear all
   clearBtn.addEventListener("click", () => {
-    if (!confirm("Clear all saved flights from this device?")) return;
-    records = [];
-    saveRecords(records);
-    renderRecords(records);
-    renderPassengerSelect(records);
+    if (!confirm("Clear all trips and flights from this device?")) return;
+    trips = [];
+    saveTrips(trips);
+    renderTrips(trips);
+    renderPassengerSelect(trips);
+    renderTripSelect(trips);
     updateSubmitButtonState();
   });
 });
