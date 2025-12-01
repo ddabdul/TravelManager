@@ -26,6 +26,20 @@ function normalizeFlightNumber(flightNumber) {
   return flightNumber.replace(/\s+/g, "").toUpperCase();
 }
 
+/**
+ * Check that the flight number has a plausible IATA-style format:
+ * - 2 alphanumeric airline characters (letters or letter+digit)
+ * - optional space
+ * - 1–4 digits
+ * Examples: "LH438", "BA 2785", "U2145"
+ */
+function isValidFlightNumber(input) {
+  if (!input || typeof input !== "string") return false;
+  const trimmed = input.trim().toUpperCase();
+  const pattern = /^[A-Z0-9]{2}\s?\d{1,4}$/;
+  return pattern.test(trimmed);
+}
+
 function loadRecords() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -318,12 +332,12 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const flightNumber = inputFlight.value.trim();
+    const flightNumberRaw = inputFlight.value.trim();
     const flightDate = inputDate.value;
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
 
-    if (!flightNumber) {
+    if (!flightNumberRaw) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter a flight number." },
         null,
@@ -331,6 +345,19 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       return;
     }
+
+    if (!isValidFlightNumber(flightNumberRaw)) {
+      outputEl.textContent = JSON.stringify(
+        {
+          error:
+            "Flight number format is invalid. Use something like LH438 or BA 2785 (2 letters/letter+digit + 1–4 digits)."
+        },
+        null,
+        2
+      );
+      return;
+    }
+
     if (!flightDate) {
       outputEl.textContent = JSON.stringify(
         { error: "Please enter the flight date." },
@@ -340,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const flightNumber = flightNumberRaw; // keep original spacing for display
     const cachedRoute = findCachedRoute(records, flightNumber, flightDate);
     let route;
 
