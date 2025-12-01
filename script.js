@@ -142,6 +142,7 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
 
     if (!normRec || normRec !== normTarget) continue;
 
+    // Exact same date
     if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
       return rec.route;
     }
@@ -243,7 +244,7 @@ async function importRecordsFromFile(file) {
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("Expected an array of records in the JSON.");
+    throw new Error("Expected an array of records in the JSON (array).");
   }
 
   return parsed;
