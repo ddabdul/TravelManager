@@ -2,7 +2,7 @@
 // Config & storage
 // =========================
 
-const STORAGE_KEY = "flightTrips"; // new key: trips-based model
+const STORAGE_KEY = "flightTrips"; // trips-based model
 let API_KEY = null; // will be loaded from config.json
 
 function normalizePassengerNames(names) {
@@ -165,6 +165,12 @@ function renderTripSelect(trips) {
 
   select.disabled = false;
 
+  // Placeholder: "new trip" option with empty value
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "— New trip —";
+  select.appendChild(placeholder);
+
   trips.forEach((trip) => {
     const opt = document.createElement("option");
     opt.value = String(trip.id);
@@ -176,6 +182,9 @@ function renderTripSelect(trips) {
       : trip.name;
     select.appendChild(opt);
   });
+
+  // Start with placeholder selected (so user must choose)
+  select.value = "";
 }
 
 // ---- Route caching ----
@@ -265,8 +274,6 @@ async function fetchRoute(flightNumberRaw) {
 /**
  * Helper: override just the DATE part of a scheduled datetime,
  * keeping the time (and timezone) if present.
- * - travelDate: "YYYY-MM-DD"
- * - original: e.g. "2025-12-01T16:00:00+00:00" or "2025-12-01 16:00:00"
  */
 function overrideScheduledDate(travelDate, original) {
   if (!travelDate) return original;
@@ -326,7 +333,6 @@ function adjustRouteDatesToFlightDate(route, flightDate) {
 
 /**
  * Import trips from a JSON file.
- * The file must contain an array of trip objects.
  */
 async function importTripsFromFile(file) {
   const text = await file.text();
@@ -384,7 +390,38 @@ document.addEventListener("DOMContentLoaded", () => {
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
 
+  // --- helper: enable/disable flight-related fields based on trip selection ---
+  function setFlightFieldsEnabled(enabled) {
+    const flag = !!enabled;
+
+    inputFlight.disabled = !flag;
+    inputDate.disabled = !flag;
+    inputPaxNew.disabled = !flag;
+    inputPnr.disabled = !flag;
+
+    if (!flag) {
+      // Lock passenger select too
+      selectPaxExisting.disabled = true;
+      // Clear values when locking (optional but keeps flow clean)
+      inputFlight.value = "";
+      inputDate.value = "";
+      inputPaxNew.value = "";
+      inputPnr.value = "";
+      Array.from(selectPaxExisting.options).forEach((opt) => {
+        opt.selected = false;
+      });
+
+      if (flightErrorEl) flightErrorEl.textContent = "";
+      if (dateErrorEl) dateErrorEl.textContent = "";
+      if (paxErrorEl) paxErrorEl.textContent = "";
+    } else {
+      // Re-render passengers so their enabled/disabled status is consistent
+      renderPassengerSelect(trips);
+    }
+  }
+
   // --- Live validation & button enabling ---
+
   function hasPassengerSelectedOrNew() {
     const selectedExisting = Array.from(
       selectPaxExisting.selectedOptions || []
@@ -402,11 +439,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function hasValidTripSelection() {
-    const selectedTripId =
-      !selectTripExisting.disabled && selectTripExisting.value
-        ? selectTripExisting.value
-        : "";
     const newTripName = (inputTripNew.value || "").trim();
+
+    let selectedTripId = "";
+    if (!selectTripExisting.disabled) {
+      const val = selectTripExisting.value;
+      selectedTripId = val && val !== "" ? val : "";
+    }
 
     if (!selectedTripId && !newTripName) {
       // nothing chosen
@@ -423,17 +462,53 @@ document.addEventListener("DOMContentLoaded", () => {
     const flightRaw = inputFlight.value.trim();
     const dateVal = inputDate.value;
 
+    const tripOk = hasValidTripSelection();
+
+    // STEP 1: Trip must be valid before anything else
+    if (!tripOk) {
+      setFlightFieldsEnabled(false);
+      submitBtn.disabled = true;
+
+      // Trip-specific error
+      if (tripErrorEl) {
+        const newTripName = (inputTripNew.value || "").trim();
+        let selectedTripId = "";
+        if (!selectTripExisting.disabled) {
+          const val = selectTripExisting.value;
+          selectedTripId = val && val !== "" ? val : "";
+        }
+
+        if (!selectedTripId && !newTripName) {
+          tripErrorEl.textContent =
+            "Step 1: select an existing trip or enter a new trip name.";
+        } else if (selectedTripId && newTripName) {
+          tripErrorEl.textContent =
+            "Choose either an existing trip OR a new trip name, not both.";
+        } else {
+          tripErrorEl.textContent = "";
+        }
+      }
+
+      // No other field should complain until trip is chosen
+      if (flightErrorEl) flightErrorEl.textContent = "";
+      if (dateErrorEl) dateErrorEl.textContent = "";
+      if (paxErrorEl) paxErrorEl.textContent = "";
+
+      return;
+    }
+
+    // Trip is OK → STEP 2: unlock flight fields
+    setFlightFieldsEnabled(true);
+
     const flightOk = isValidFlightNumber(flightRaw);
     const dateOk = !!dateVal;
     const paxOk = hasPassengerSelectedOrNew();
-    const tripOk = hasValidTripSelection();
 
     const allOk = flightOk && dateOk && paxOk && tripOk;
 
-    // Button enabled/disabled
     submitBtn.disabled = !allOk;
 
-    // Subtle inline errors
+    // Now show other subtle errors
     if (flightErrorEl) {
       flightErrorEl.textContent =
         flightRaw && !flightOk
@@ -443,36 +518,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (dateErrorEl) {
       dateErrorEl.textContent =
-        !dateOk && (flightRaw || paxOk || hasValidTripSelection())
+        !dateOk && (flightRaw || paxOk)
           ? "Select a flight date."
           : "";
     }
 
     if (paxErrorEl) {
       paxErrorEl.textContent =
-        !paxOk && (flightRaw || dateOk || hasValidTripSelection())
+        !paxOk && (flightRaw || dateOk)
           ? "Add or select at least one passenger."
           : "";
     }
 
     if (tripErrorEl) {
-      const selectedTripId =
-        !selectTripExisting.disabled && selectTripExisting.value
-          ? selectTripExisting.value
-          : "";
-      const newTripName = (inputTripNew.value || "").trim();
-
-      if (!selectedTripId && !newTripName) {
-        tripErrorEl.textContent =
-          (flightRaw || dateOk || paxOk)
-            ? "Select an existing trip or enter a new trip name."
-            : "";
-      } else if (selectedTripId && newTripName) {
-        tripErrorEl.textContent =
-          "Choose either an existing trip OR a new trip name, not both.";
-      } else {
-        tripErrorEl.textContent = "";
-      }
+      tripErrorEl.textContent = "";
     }
   }
 
@@ -484,7 +543,8 @@ document.addEventListener("DOMContentLoaded", () => {
   selectTripExisting.addEventListener("change", updateSubmitButtonState);
   inputTripNew.addEventListener("input", updateSubmitButtonState);
 
-  // Initial state (likely disabled)
+  // Initial state: all flight fields locked until a trip is chosen/created
+  setFlightFieldsEnabled(false);
   updateSubmitButtonState();
 
   // --- Form submit ---
@@ -496,26 +556,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
     const newTripName = (inputTripNew.value || "").trim();
-    const selectedTripId =
-      !selectTripExisting.disabled && selectTripExisting.value
-        ? selectTripExisting.value
-        : "";
 
-    // Safety net validations
-    if (!flightNumberRaw) {
+    let selectedTripId = "";
+    if (!selectTripExisting.disabled) {
+      const val = selectTripExisting.value;
+      selectedTripId = val && val !== "" ? val : "";
+    }
+
+    // Safety net validations (in case someone bypasses disabled state)
+    if (!hasValidTripSelection()) {
       outputEl.textContent = JSON.stringify(
-        { error: "Please enter a flight number." },
+        {
+          error:
+            "Step 1: select an existing trip or enter a new trip name (but not both)."
+        },
         null,
         2
       );
       return;
     }
 
-    if (!isValidFlightNumber(flightNumberRaw)) {
+    if (!flightNumberRaw || !isValidFlightNumber(flightNumberRaw)) {
       outputEl.textContent = JSON.stringify(
         {
           error:
-            "Flight number format is invalid. Use something like LH438 or BA 2785 (2 letters/letter+digit + 1–4 digits)."
+            "Flight number is missing or invalid. Use something like LH438 or BA 2785."
         },
         null,
         2
@@ -541,19 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (!hasValidTripSelection()) {
-      outputEl.textContent = JSON.stringify(
-        {
-          error:
-            "You must either select an existing trip OR enter a new trip name (but not both)."
-        },
-        null,
-        2
-      );
-      return;
-    }
-
-    const flightNumber = flightNumberRaw; // keep original spacing for display
+    const flightNumber = flightNumberRaw;
     const cachedRoute = findCachedRoute(trips, flightNumber, flightDate);
     let route;
 
@@ -659,7 +712,6 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error("Selected trip not found.");
         }
       } else {
-        // Should not happen if validations are correct
         throw new Error(
           "Trip selection invalid. Please select a trip or enter a new name."
         );
@@ -671,27 +723,24 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPassengerSelect(trips);
       renderTripSelect(trips);
 
-      // If we just created a new trip, select it in the dropdown
-      if (newTripName && tripToUse && selectTripExisting && !selectTripExisting.disabled) {
+      // Ensure current trip is selected in dropdown
+      if (tripToUse && !selectTripExisting.disabled) {
         selectTripExisting.value = String(tripToUse.id);
       }
 
-      // ---- Clear per-record fields after save (keep the trip selection) ----
+      // Clear per-record fields after save (keep trip selection)
       inputFlight.value = "";
       inputDate.value = "";
       inputPnr.value = "";
       inputPaxNew.value = "";
-      // Clear all selections in the multi-select
       Array.from(selectPaxExisting.options).forEach((opt) => {
         opt.selected = false;
       });
-      // Clear new trip name field
       inputTripNew.value = "";
 
-      // Recompute button + errors after clearing
       updateSubmitButtonState();
 
-      // ---- Alert showing what was saved ----
+      // Alert showing what was saved
       const flightLabel =
         (record.route && record.route.flightNumber) || flightNumber;
       const depIata =
@@ -719,7 +768,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       alert(alertMsg);
-      // ---------------------------------------------
     } catch (err) {
       console.error("Error saving record:", err);
       outputEl.textContent = JSON.stringify(
@@ -733,7 +781,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Import JSON (upload)
   importBtn.addEventListener("click", () => {
     if (!importFileInput) return;
-    importFileInput.value = ""; // allow re-selecting same file
+    importFileInput.value = "";
     importFileInput.click();
   });
 
@@ -758,7 +806,6 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTripSelect(trips);
       alert("Trips file imported successfully.");
 
-      // After import, re-evaluate state (passengers & trips changed)
       updateSubmitButtonState();
     } catch (err) {
       console.error("Import error:", err);
