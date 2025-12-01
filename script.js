@@ -229,6 +229,26 @@ function adjustRouteDatesToFlightDate(route, flightDate) {
   return copy;
 }
 
+/**
+ * Import records from a JSON file.
+ * The file must contain an array of record objects.
+ */
+async function importRecordsFromFile(file) {
+  const text = await file.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    throw new Error("File is not valid JSON.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Expected an array of records in the JSON.");
+  }
+
+  return parsed;
+}
+
 // =========================
 // App bootstrap
 // =========================
@@ -241,8 +261,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectPaxExisting = document.getElementById("pax-existing");
   const inputPaxNew = document.getElementById("pax-new");
   const inputPnr = document.getElementById("pnr");
+
+  const importBtn = document.getElementById("import-json");
+  const importFileInput = document.getElementById("import-json-file");
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
+
+  console.log("Flight Log app script loaded");
 
   let records = loadRecords();
   renderRecords(records);
@@ -302,7 +327,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const useCached = window.confirm(msg);
 
         if (useCached) {
-          // Adjust cached route dates to this travel date
           route = adjustRouteDatesToFlightDate(cachedRoute, flightDate);
           outputEl.textContent = JSON.stringify(
             { ...route, _source: "cache" },
@@ -378,6 +402,39 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Import JSON (upload)
+  importBtn.addEventListener("click", () => {
+    if (!importFileInput) return;
+    importFileInput.value = ""; // allow re-selecting same file
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    try {
+      const importedRecords = await importRecordsFromFile(file);
+
+      const useImported = window.confirm(
+        "Replace current log with data from this file?"
+      );
+      if (!useImported) {
+        return;
+      }
+
+      records = importedRecords;
+      saveRecords(records);
+      renderRecords(records);
+      renderPassengerSelect(records);
+      alert("Travel file imported successfully.");
+    } catch (err) {
+      console.error("Import error:", err);
+      alert("Could not import file: " + err.message);
+    }
+  });
+
+  // Download JSON
   downloadBtn.addEventListener("click", () => {
     const dataStr = JSON.stringify(records, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
@@ -392,6 +449,7 @@ document.addEventListener("DOMContentLoaded", () => {
     URL.revokeObjectURL(url);
   });
 
+  // Clear all
   clearBtn.addEventListener("click", () => {
     if (!confirm("Clear all saved flights from this device?")) return;
     records = [];
