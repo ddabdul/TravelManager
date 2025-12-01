@@ -105,6 +105,7 @@ async function loadApiKeyFromConfigJson() {
 
 function renderTrips(trips) {
   const savedEl = document.getElementById("saved-json");
+  if (!savedEl) return;
   savedEl.textContent = JSON.stringify(trips, null, 2);
 }
 
@@ -125,6 +126,8 @@ function getPassengerList(trips) {
 
 function renderPassengerSelect(trips) {
   const select = document.getElementById("pax-existing");
+  if (!select) return;
+
   const passengers = getPassengerList(trips);
 
   select.innerHTML = "";
@@ -350,6 +353,143 @@ async function importTripsFromFile(file) {
   return parsed;
 }
 
+/**
+ * Format time from ISO string or "YYYY-MM-DD HH:MM:SS" style.
+ * Returns "HH:MM" or "--:--".
+ */
+function formatTimeFromISO(isoString) {
+  if (!isoString || typeof isoString !== "string") return "--:--";
+
+  const d = new Date(isoString);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  // Fallback: try to grab HH:MM from the string
+  const m1 = isoString.match(/T(\d{2}:\d{2})/);
+  if (m1) return m1[1];
+  const m2 = isoString.match(/\s(\d{2}:\d{2})/);
+  if (m2) return m2[1];
+
+  return "--:--";
+}
+
+/**
+ * Render tiles for flights of the selected trip.
+ */
+function renderTripFlights(trips, selectedTripId) {
+  const listEl = document.getElementById("trip-flights-list");
+  const summaryEl = document.getElementById("trip-flights-summary");
+  if (!listEl) return;
+
+  listEl.innerHTML = "";
+  let summaryText = "No trip selected";
+
+  if (!trips || trips.length === 0) {
+    listEl.innerHTML =
+      '<div class="tiles-empty">No trips yet. Create a new trip above to start logging flights.</div>';
+    if (summaryEl) summaryEl.textContent = "No trips";
+    return;
+  }
+
+  const inputTripNew = document.getElementById("trip-new-name");
+  const newTripName = (inputTripNew && inputTripNew.value || "").trim();
+
+  // No existing trip selected
+  if (!selectedTripId) {
+    if (newTripName) {
+      listEl.innerHTML =
+        '<div class="tiles-empty">This new trip has no flights yet. Save a flight below to add the first one.</div>';
+      if (summaryEl) {
+        summaryEl.textContent = `${newTripName} • 0 flights`;
+      }
+    } else {
+      listEl.innerHTML =
+        '<div class="tiles-empty">Select an existing trip or enter a new trip name to see its flights.</div>';
+      if (summaryEl) summaryEl.textContent = "No trip selected";
+    }
+    return;
+  }
+
+  const trip = trips.find((t) => String(t.id) === String(selectedTripId));
+  if (!trip) {
+    listEl.innerHTML =
+      '<div class="tiles-empty">Trip not found.</div>';
+    if (summaryEl) summaryEl.textContent = "No trip selected";
+    return;
+  }
+
+  const records = Array.isArray(trip.records) ? [...trip.records] : [];
+
+  // Sort by flightDate then by departure time if available
+  records.sort((a, b) => {
+    const da = a.flightDate || "";
+    const db = b.flightDate || "";
+    if (da < db) return -1;
+    if (da > db) return 1;
+    const ta = (a.route && a.route.departure && a.route.departure.scheduled) || "";
+    const tb = (b.route && b.route.departure && b.route.departure.scheduled) || "";
+    return ta.localeCompare(tb);
+  });
+
+  if (records.length === 0) {
+    listEl.innerHTML =
+      '<div class="tiles-empty">This trip has no flights yet. Save a flight below.</div>';
+    if (summaryEl) summaryEl.textContent = `${trip.name} • 0 flights`;
+    return;
+  }
+
+  for (const rec of records) {
+    const route = rec.route || {};
+    const dep = route.departure || {};
+    const arr = route.arrival || {};
+
+    const flightNum = route.flightNumber || "(no flight #)";
+    const date =
+      rec.flightDate ||
+      (dep.scheduled && dep.scheduled.slice(0, 10)) ||
+      "";
+
+    const depIata = dep.iata || dep.airport || "?";
+    const arrIata = arr.iata || arr.airport || "?";
+    const depTime = formatTimeFromISO(dep.scheduled);
+    const arrTime = formatTimeFromISO(arr.scheduled);
+
+    const paxNames =
+      Array.isArray(rec.paxNames) && rec.paxNames.length > 0
+        ? rec.paxNames.join(", ")
+        : "No passengers";
+
+    const tile = document.createElement("div");
+    tile.className = "flight-tile";
+    tile.innerHTML = `
+      <div class="flight-tile-header">
+        <div class="flight-tile-flightnum">${flightNum}</div>
+        <div class="flight-tile-date">${date || ""}</div>
+      </div>
+      <div class="flight-tile-route">
+        <strong>${depIata}</strong> → <strong>${arrIata}</strong>
+      </div>
+      <div class="flight-tile-times">
+        Dep ${depTime} • Arr ${arrTime}
+      </div>
+      <div class="flight-tile-pax">
+        ${paxNames}
+      </div>
+    `;
+    listEl.appendChild(tile);
+  }
+
+  if (summaryEl) {
+    summaryEl.textContent = `${trip.name} • ${records.length} flight${
+      records.length !== 1 ? "s" : ""
+    }`;
+  }
+}
+
 // =========================
 // App bootstrap
 // =========================
@@ -390,6 +530,13 @@ document.addEventListener("DOMContentLoaded", () => {
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
 
+  // helper to get currently selected trip id (existing trip only)
+  function getSelectedTripId() {
+    if (!selectTripExisting || selectTripExisting.disabled) return "";
+    const val = selectTripExisting.value;
+    return val && val !== "" ? val : "";
+  }
+
   // --- helper: enable/disable flight-related fields based on trip selection ---
   function setFlightFieldsEnabled(enabled) {
     const flag = !!enabled;
@@ -401,15 +548,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!flag) {
       // Lock passenger select too
-      selectPaxExisting.disabled = true;
-      // Clear values when locking (optional but keeps flow clean)
+      if (selectPaxExisting) {
+        selectPaxExisting.disabled = true;
+        Array.from(selectPaxExisting.options).forEach((opt) => {
+          opt.selected = false;
+        });
+      }
+      // Clear values when locking
       inputFlight.value = "";
       inputDate.value = "";
       inputPaxNew.value = "";
       inputPnr.value = "";
-      Array.from(selectPaxExisting.options).forEach((opt) => {
-        opt.selected = false;
-      });
 
       if (flightErrorEl) flightErrorEl.textContent = "";
       if (dateErrorEl) dateErrorEl.textContent = "";
@@ -424,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function hasPassengerSelectedOrNew() {
     const selectedExisting = Array.from(
-      selectPaxExisting.selectedOptions || []
+      selectPaxExisting && selectPaxExisting.selectedOptions || []
     )
       .map((opt) => opt.value)
       .filter(Boolean);
@@ -441,11 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function hasValidTripSelection() {
     const newTripName = (inputTripNew.value || "").trim();
 
-    let selectedTripId = "";
-    if (!selectTripExisting.disabled) {
-      const val = selectTripExisting.value;
-      selectedTripId = val && val !== "" ? val : "";
-    }
+    const selectedTripId = getSelectedTripId();
 
     if (!selectedTripId && !newTripName) {
       // nothing chosen
@@ -472,11 +617,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Trip-specific error
       if (tripErrorEl) {
         const newTripName = (inputTripNew.value || "").trim();
-        let selectedTripId = "";
-        if (!selectTripExisting.disabled) {
-          const val = selectTripExisting.value;
-          selectedTripId = val && val !== "" ? val : "";
-        }
+        const selectedTripId = getSelectedTripId();
 
         if (!selectedTripId && !newTripName) {
           tripErrorEl.textContent =
@@ -535,16 +676,29 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Attach listeners to keep button state in sync
+  // Attach listeners to keep button state & tiles in sync
   inputFlight.addEventListener("input", updateSubmitButtonState);
   inputDate.addEventListener("input", updateSubmitButtonState);
-  selectPaxExisting.addEventListener("change", updateSubmitButtonState);
+  if (selectPaxExisting) {
+    selectPaxExisting.addEventListener("change", updateSubmitButtonState);
+  }
   inputPaxNew.addEventListener("input", updateSubmitButtonState);
-  selectTripExisting.addEventListener("change", updateSubmitButtonState);
-  inputTripNew.addEventListener("input", updateSubmitButtonState);
+
+  if (selectTripExisting) {
+    selectTripExisting.addEventListener("change", () => {
+      renderTripFlights(trips, getSelectedTripId());
+      updateSubmitButtonState();
+    });
+  }
+
+  inputTripNew.addEventListener("input", () => {
+    renderTripFlights(trips, getSelectedTripId());
+    updateSubmitButtonState();
+  });
 
   // Initial state: all flight fields locked until a trip is chosen/created
   setFlightFieldsEnabled(false);
+  renderTripFlights(trips, getSelectedTripId());
   updateSubmitButtonState();
 
   // --- Form submit ---
@@ -556,14 +710,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
     const newTripName = (inputTripNew.value || "").trim();
+    const selectedTripId = getSelectedTripId();
 
-    let selectedTripId = "";
-    if (!selectTripExisting.disabled) {
-      const val = selectTripExisting.value;
-      selectedTripId = val && val !== "" ? val : "";
-    }
-
-    // Safety net validations (in case someone bypasses disabled state)
+    // Safety net validations
     if (!hasValidTripSelection()) {
       outputEl.textContent = JSON.stringify(
         {
@@ -667,7 +816,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const selectedExistingPax = Array.from(
-        selectPaxExisting.selectedOptions || []
+        selectPaxExisting && selectPaxExisting.selectedOptions || []
       )
         .map((opt) => opt.value)
         .filter(Boolean);
@@ -724,18 +873,23 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTripSelect(trips);
 
       // Ensure current trip is selected in dropdown
-      if (tripToUse && !selectTripExisting.disabled) {
+      if (tripToUse && selectTripExisting && !selectTripExisting.disabled) {
         selectTripExisting.value = String(tripToUse.id);
       }
+
+      // Re-render tiles for this trip
+      renderTripFlights(trips, tripToUse.id);
 
       // Clear per-record fields after save (keep trip selection)
       inputFlight.value = "";
       inputDate.value = "";
       inputPnr.value = "";
       inputPaxNew.value = "";
-      Array.from(selectPaxExisting.options).forEach((opt) => {
-        opt.selected = false;
-      });
+      if (selectPaxExisting) {
+        Array.from(selectPaxExisting.options).forEach((opt) => {
+          opt.selected = false;
+        });
+      }
       inputTripNew.value = "";
 
       updateSubmitButtonState();
@@ -804,6 +958,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTrips(trips);
       renderPassengerSelect(trips);
       renderTripSelect(trips);
+      renderTripFlights(trips, getSelectedTripId());
       alert("Trips file imported successfully.");
 
       updateSubmitButtonState();
@@ -836,6 +991,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTrips(trips);
     renderPassengerSelect(trips);
     renderTripSelect(trips);
+    renderTripFlights(trips, "");
     updateSubmitButtonState();
   });
 });
