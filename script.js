@@ -142,10 +142,12 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
 
     if (!normRec || normRec !== normTarget) continue;
 
+    // Exact same date → perfect match
     if (rec.flightDate && flightDate && rec.flightDate === flightDate) {
       return rec.route;
     }
 
+    // Remember at least one route for this flight number
     if (!fallbackRoute) {
       fallbackRoute = rec.route;
     }
@@ -203,6 +205,23 @@ async function fetchRoute(flightNumberRaw) {
   };
 
   return route;
+}
+
+/**
+ * Override the departure/arrival 'scheduled' fields
+ * with the user-provided travel date (YYYY-MM-DD).
+ */
+function adjustRouteForDate(route, flightDate) {
+  const copy = JSON.parse(JSON.stringify(route || {}));
+
+  if (!copy.departure) copy.departure = {};
+  if (!copy.arrival) copy.arrival = {};
+
+  // Store the user's travel date as the scheduled date
+  copy.departure.scheduled = flightDate;
+  copy.arrival.scheduled = flightDate;
+
+  return copy;
 }
 
 /**
@@ -278,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const cachedRoute = findCachedRoute(records, flightNumber, flightDate);
     let route;
 
+    // ---- Route lookup (cache vs API) with date adjustment ----
     try {
       if (cachedRoute) {
         const depAirport =
@@ -301,7 +321,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const useCached = window.confirm(msg);
 
         if (useCached) {
-          route = cachedRoute;
+          // Use cached route as template, override scheduled with this travel date
+          route = adjustRouteForDate(cachedRoute, flightDate);
           outputEl.textContent = JSON.stringify(
             { ...route, _source: "cache" },
             null,
@@ -313,16 +334,19 @@ document.addEventListener("DOMContentLoaded", () => {
             null,
             2
           );
-          route = await fetchRoute(flightNumber);
+          const freshRoute = await fetchRoute(flightNumber);
+          route = adjustRouteForDate(freshRoute, flightDate);
           outputEl.textContent = JSON.stringify(route, null, 2);
         }
       } else {
+        // No cached route: go straight to API
         outputEl.textContent = JSON.stringify(
           { status: "Loading route from API..." },
           null,
           2
         );
-        route = await fetchRoute(flightNumber);
+        const freshRoute = await fetchRoute(flightNumber);
+        route = adjustRouteForDate(freshRoute, flightDate);
         outputEl.textContent = JSON.stringify(route, null, 2);
       }
     } catch (err) {
@@ -331,6 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // ---- Save record with adjusted route ----
     try {
       const selectedExisting = Array.from(
         selectPaxExisting.selectedOptions || []
