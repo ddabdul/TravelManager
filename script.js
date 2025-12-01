@@ -208,27 +208,9 @@ async function fetchRoute(flightNumberRaw) {
 }
 
 /**
- * Take an original scheduled datetime and override just the date part
- * with the user-provided travel date (YYYY-MM-DD).
- * If no recognizable time part exists, we just return the date.
- */
-function overrideScheduledDate(travelDate, original) {
-  if (!travelDate) return original;
-
-  if (typeof original === "string" && original.includes("T")) {
-    const tIndex = original.indexOf("T");
-    const timePart = original.slice(tIndex); // includes the "T"
-    return travelDate + timePart;
-  }
-
-  // Fallback: just use the date
-  return travelDate;
-}
-
-/**
- * Override the departure/arrival 'scheduled' fields
- * with the user-provided travel date (YYYY-MM-DD),
- * preserving time-of-day if present.
+ * Force the departure/arrival 'scheduled' fields
+ * to equal the user-provided travel date (YYYY-MM-DD).
+ * We deliberately ignore the API's date part.
  */
 function adjustRouteForDate(route, flightDate) {
   const copy = JSON.parse(JSON.stringify(route || {}));
@@ -236,14 +218,14 @@ function adjustRouteForDate(route, flightDate) {
   if (!copy.departure) copy.departure = {};
   if (!copy.arrival) copy.arrival = {};
 
-  copy.departure.scheduled = overrideScheduledDate(
-    flightDate,
-    copy.departure.scheduled
-  );
-  copy.arrival.scheduled = overrideScheduledDate(
-    flightDate,
-    copy.arrival.scheduled
-  );
+  copy.departure.scheduled = flightDate;
+  copy.arrival.scheduled = flightDate;
+
+  console.log("adjustRouteForDate:", {
+    travelDate: flightDate,
+    before: route,
+    after: copy
+  });
 
   return copy;
 }
@@ -285,6 +267,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtn = document.getElementById("download-json");
   const clearBtn = document.getElementById("clear-json");
 
+  console.log("Flight Log app script loaded");
+
   // Load existing records from localStorage on launch
   let records = loadRecords();
   renderRecords(records);
@@ -300,6 +284,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const flightDate = inputDate.value;
     const pnrRaw = inputPnr.value.trim();
     const paxNewRaw = inputPaxNew.value.trim();
+
+    console.log("Form submit:", { flightNumber, flightDate });
 
     if (!flightNumber) {
       outputEl.textContent = JSON.stringify(
@@ -345,7 +331,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const useCached = window.confirm(msg);
 
         if (useCached) {
-          // Use cached route as template, override scheduled with this travel date
           route = adjustRouteForDate(cachedRoute, flightDate);
           outputEl.textContent = JSON.stringify(
             { ...route, _source: "cache" },
@@ -407,6 +392,8 @@ document.addEventListener("DOMContentLoaded", () => {
         paxNames: paxNames,
         route: route
       };
+
+      console.log("Saving record:", record);
 
       records.push(record);
       saveRecords(records);
