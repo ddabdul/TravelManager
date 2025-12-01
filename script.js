@@ -547,7 +547,7 @@ document.addEventListener("DOMContentLoaded", () => {
     inputPnr.disabled = !flag;
 
     if (!flag) {
-      // Lock passenger select too
+      // Lock passenger select too and clear selection
       if (selectPaxExisting) {
         selectPaxExisting.disabled = true;
         Array.from(selectPaxExisting.options).forEach((opt) => {
@@ -564,8 +564,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (dateErrorEl) dateErrorEl.textContent = "";
       if (paxErrorEl) paxErrorEl.textContent = "";
     } else {
-      // Re-render passengers so their enabled/disabled status is consistent
-      renderPassengerSelect(trips);
+      // Just enable the select; do NOT re-render options here
+      if (selectPaxExisting) {
+        selectPaxExisting.disabled = false;
+      }
     }
   }
 
@@ -573,7 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function hasPassengerSelectedOrNew() {
     const selectedExisting = Array.from(
-      selectPaxExisting && selectPaxExisting.selectedOptions || []
+      (selectPaxExisting && selectPaxExisting.selectedOptions) || []
     )
       .map((opt) => opt.value)
       .filter(Boolean);
@@ -816,7 +818,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const selectedExistingPax = Array.from(
-        selectPaxExisting && selectPaxExisting.selectedOptions || []
+        (selectPaxExisting && selectPaxExisting.selectedOptions) || []
       )
         .map((opt) => opt.value)
         .filter(Boolean);
