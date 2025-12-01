@@ -41,7 +41,12 @@
           <!-- Trip selection / creation -->
           <div class="card card-trip">
             <div class="card-header">
-              <div class="card-title">Trip selection</div>
+              <div class="card-heading">
+                <div class="card-title">Trip selection</div>
+                <div class="card-subtitle">
+                  Step 1 – choose an existing trip or create a new one.
+                </div>
+              </div>
               <span class="chip">Step 1</span>
             </div>
 
@@ -88,21 +93,30 @@
                 Select an existing trip or enter a new trip name to see flights here.
               </div>
             </div>
+
+            <!-- Add flight button under tiles -->
+            <div class="button-row tiles-add-row">
+              <button id="add-flight-btn" class="btn btn-primary" disabled>
+                <span class="btn-icon">＋</span>
+                <span>Add flight</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- RIGHT: Flight form + data / backup -->
       <section class="panel panel-right">
-        <!-- New flight card -->
-        <section class="card card-flight">
+        <!-- New flight card – hidden until "Add flight" -->
+        <section class="card card-flight hidden">
           <div class="card-header">
-            <div>
+            <div class="card-heading">
               <div class="card-title">New flight</div>
               <div class="card-subtitle">
                 Step 2 – add a flight to the selected trip.
               </div>
             </div>
+            <span class="chip">Step 2</span>
           </div>
 
           <form id="flight-form">
@@ -117,7 +131,7 @@
                   autocomplete="off"
                   required
                 />
-                <small>2 airline characters + 1–4 digits, e.g. BA2785.</small>
+                <small>2 airline letters + 1–4 digits, e.g. BA2785.</small>
                 <div id="flight-error" class="field-error" aria-live="polite"></div>
               </div>
 
@@ -192,9 +206,11 @@
         <!-- Data / backup card -->
         <section class="card card-data">
           <div class="card-header">
-            <div class="card-title">Data &amp; backup</div>
-            <div class="card-subtitle">
-              Your trips are stored locally in this browser. Export or import them as JSON.
+            <div class="card-heading">
+              <div class="card-title">Data &amp; backup</div>
+              <div class="card-subtitle">
+                Trips are stored locally in this browser. Export or import them as JSON.
+              </div>
             </div>
           </div>
 
