@@ -208,8 +208,27 @@ async function fetchRoute(flightNumberRaw) {
 }
 
 /**
- * Override the departure/arrival 'scheduled' fields
+ * Take an original scheduled datetime and override just the date part
  * with the user-provided travel date (YYYY-MM-DD).
+ * If no recognizable time part exists, we just return the date.
+ */
+function overrideScheduledDate(travelDate, original) {
+  if (!travelDate) return original;
+
+  if (typeof original === "string" && original.includes("T")) {
+    const tIndex = original.indexOf("T");
+    const timePart = original.slice(tIndex); // includes the "T"
+    return travelDate + timePart;
+  }
+
+  // Fallback: just use the date
+  return travelDate;
+}
+
+/**
+ * Override the departure/arrival 'scheduled' fields
+ * with the user-provided travel date (YYYY-MM-DD),
+ * preserving time-of-day if present.
  */
 function adjustRouteForDate(route, flightDate) {
   const copy = JSON.parse(JSON.stringify(route || {}));
@@ -217,9 +236,14 @@ function adjustRouteForDate(route, flightDate) {
   if (!copy.departure) copy.departure = {};
   if (!copy.arrival) copy.arrival = {};
 
-  // Store the user's travel date as the scheduled date
-  copy.departure.scheduled = flightDate;
-  copy.arrival.scheduled = flightDate;
+  copy.departure.scheduled = overrideScheduledDate(
+    flightDate,
+    copy.departure.scheduled
+  );
+  copy.arrival.scheduled = overrideScheduledDate(
+    flightDate,
+    copy.arrival.scheduled
+  );
 
   return copy;
 }
