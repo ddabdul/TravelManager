@@ -207,8 +207,40 @@ async function fetchRoute(flightNumberRaw) {
 }
 
 /**
- * Force the departure/arrival 'scheduled' fields
- * to equal the user-provided travel date (YYYY-MM-DD).
+ * Helper: override just the DATE part of a scheduled datetime,
+ * keeping the time (and timezone) if present.
+ * - travelDate: "YYYY-MM-DD"
+ * - original: e.g. "2025-12-01T16:00:00+00:00" or "2025-12-01 16:00:00"
+ */
+function overrideScheduledDate(travelDate, original) {
+  if (!travelDate) return original;
+
+  if (typeof original === "string") {
+    const tIndex = original.indexOf("T");
+    const spaceIndex = original.indexOf(" ");
+    let idx = -1;
+
+    if (tIndex !== -1 && spaceIndex !== -1) {
+      idx = Math.min(tIndex, spaceIndex);
+    } else if (tIndex !== -1) {
+      idx = tIndex;
+    } else if (spaceIndex !== -1) {
+      idx = spaceIndex;
+    }
+
+    if (idx !== -1) {
+      const timePart = original.slice(idx); // includes 'T' or ' '
+      return travelDate + timePart;
+    }
+  }
+
+  // Fallback: just use the date
+  return travelDate;
+}
+
+/**
+ * Adjust departure/arrival 'scheduled' fields to the travel date,
+ * but keep the original time-of-day from the API/cache.
  */
 function adjustRouteDatesToFlightDate(route, flightDate) {
   const copy = JSON.parse(JSON.stringify(route || {}));
@@ -216,8 +248,14 @@ function adjustRouteDatesToFlightDate(route, flightDate) {
   if (!copy.departure) copy.departure = {};
   if (!copy.arrival) copy.arrival = {};
 
-  copy.departure.scheduled = flightDate;
-  copy.arrival.scheduled = flightDate;
+  copy.departure.scheduled = overrideScheduledDate(
+    flightDate,
+    copy.departure.scheduled
+  );
+  copy.arrival.scheduled = overrideScheduledDate(
+    flightDate,
+    copy.arrival.scheduled
+  );
 
   console.log("adjustRouteDatesToFlightDate", {
     travelDate: flightDate,
