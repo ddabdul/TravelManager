@@ -378,7 +378,46 @@ function formatTimeFromISO(isoString) {
 }
 
 /**
- * Render tiles for flights of the selected trip.
+ * Format a date like "Mon, Dec 1, 2025".
+ * Accepts either "YYYY-MM-DD" or a full ISO datetime.
+ */
+function formatPrettyDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+/**
+ * Compute flight duration in "Xh Ym" from two ISO datetime strings.
+ */
+function computeDuration(depISO, arrISO) {
+  if (!depISO || !arrISO) return "";
+  const dDep = new Date(depISO);
+  const dArr = new Date(arrISO);
+  if (Number.isNaN(dDep.getTime()) || Number.isNaN(dArr.getTime())) return "";
+
+  let diffMs = dArr.getTime() - dDep.getTime();
+  if (diffMs <= 0) return "";
+
+  const totalMinutes = Math.round(diffMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (!hours && !minutes) return "";
+  if (!hours) return `${minutes}m`;
+  if (!minutes) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+/**
+ * Render tiles for flights of the selected trip, in a rich layout.
  */
 function renderTripFlights(trips, selectedTripId) {
   const listEl = document.getElementById("trip-flights-list");
@@ -386,7 +425,6 @@ function renderTripFlights(trips, selectedTripId) {
   if (!listEl) return;
 
   listEl.innerHTML = "";
-  let summaryText = "No trip selected";
 
   if (!trips || trips.length === 0) {
     listEl.innerHTML =
@@ -448,38 +486,82 @@ function renderTripFlights(trips, selectedTripId) {
     const arr = route.arrival || {};
 
     const flightNum = route.flightNumber || "(no flight #)";
-    const date =
+    const airlineName = route.airline || "";
+    const dateString =
       rec.flightDate ||
       (dep.scheduled && dep.scheduled.slice(0, 10)) ||
       "";
+    const prettyDate = dateString ? formatPrettyDate(dateString) : "";
 
-    const depIata = dep.iata || dep.airport || "?";
-    const arrIata = arr.iata || arr.airport || "?";
+    const depCode = dep.iata || dep.icao || dep.airport || "?";
+    const arrCode = arr.iata || arr.icao || arr.airport || "?";
+
     const depTime = formatTimeFromISO(dep.scheduled);
     const arrTime = formatTimeFromISO(arr.scheduled);
 
+    const depName = dep.airport || dep.iata || "";
+    const arrName = arr.airport || arr.iata || "";
+
+    const duration = computeDuration(dep.scheduled, arr.scheduled);
+
     const paxNames =
       Array.isArray(rec.paxNames) && rec.paxNames.length > 0
-        ? rec.paxNames.join(", ")
-        : "No passengers";
+        ? rec.paxNames
+        : [];
 
     const tile = document.createElement("div");
     tile.className = "flight-tile";
+
     tile.innerHTML = `
       <div class="flight-tile-header">
-        <div class="flight-tile-flightnum">${flightNum}</div>
-        <div class="flight-tile-date">${date || ""}</div>
+        <span class="flight-date">${prettyDate || (dateString || "")}</span>
+        <span class="flight-airline">
+          ${airlineName ? airlineName + " " : ""}${flightNum}
+        </span>
       </div>
-      <div class="flight-tile-route">
-        <strong>${depIata}</strong> → <strong>${arrIata}</strong>
+
+      <div class="flight-route">
+        <div class="airport-info">
+          <div class="airport-code">${depCode}</div>
+          <div class="airport-time">${depTime}</div>
+          <div class="airport-name">${depName}</div>
+        </div>
+
+        <div class="flight-arrow">
+          →
+          <div class="flight-duration">${duration || ""}</div>
+        </div>
+
+        <div class="airport-info">
+          <div class="airport-code">${arrCode}</div>
+          <div class="airport-time">${arrTime}</div>
+          <div class="airport-name">${arrName}</div>
+        </div>
       </div>
-      <div class="flight-tile-times">
-        Dep ${depTime} • Arr ${arrTime}
-      </div>
-      <div class="flight-tile-pax">
-        ${paxNames}
+
+      <div class="flight-footer">
+        <div class="flight-detail">
+          <span class="flight-detail-label">Booking Ref</span>
+          <span class="flight-detail-value">${rec.pnr || "—"}</span>
+        </div>
+        <div class="passenger-names">
+          <span class="flight-detail-label">Passengers</span>
+          <div class="passenger-list">
+            ${
+              paxNames.length
+                ? paxNames
+                    .map(
+                      (name) =>
+                        `<span class="passenger-name">${name}</span>`
+                    )
+                    .join("")
+                : '<span class="passenger-name">None</span>'
+            }
+          </div>
+        </div>
       </div>
     `;
+
     listEl.appendChild(tile);
   }
 
