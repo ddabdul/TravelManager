@@ -535,14 +535,53 @@ document.addEventListener("DOMContentLoaded", () => {
         route: route
       };
 
+      // Save to in-memory and localStorage
       records.push(record);
       saveRecords(records);
       renderRecords(records);
       renderPassengerSelect(records);
-      inputPaxNew.value = "";
 
-      // Recompute button state (e.g. passengers list changed)
+      // ---- NEW: clear all form fields after save ----
+      inputFlight.value = "";
+      inputDate.value = "";
+      inputPnr.value = "";
+      inputPaxNew.value = "";
+      // Clear all selections in the multi-select
+      Array.from(selectPaxExisting.options).forEach((opt) => {
+        opt.selected = false;
+      });
+
+      // Recompute button + errors after clearing
       updateSubmitButtonState();
+
+      // ---- NEW: alert showing what was saved ----
+      const flightLabel =
+        (record.route && record.route.flightNumber) || flightNumber;
+      const depIata =
+        record.route &&
+        record.route.departure &&
+        record.route.departure.iata;
+      const arrIata =
+        record.route && record.route.arrival && record.route.arrival.iata;
+      const routeLabel =
+        depIata || arrIata ? ` (${depIata || "?"} → ${arrIata || "?"})` : "";
+
+      const paxList =
+        Array.isArray(record.paxNames) && record.paxNames.length > 0
+          ? record.paxNames.join(", ")
+          : "None";
+
+      let alertMsg =
+        `Saved flight ${flightLabel}${routeLabel}\n` +
+        `Date: ${record.flightDate}\n` +
+        `Passengers: ${paxList}`;
+
+      if (record.pnr) {
+        alertMsg += `\nPNR: ${record.pnr}`;
+      }
+
+      alert(alertMsg);
+      // ---------------------------------------------
     } catch (err) {
       console.error("Error saving record:", err);
       outputEl.textContent = JSON.stringify(
