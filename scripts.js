@@ -3,8 +3,7 @@
 // =========================
 
 const STORAGE_KEY = "flightRecords";
-const API_KEY_STORAGE_KEY = "flightLogApiKey";
-let API_KEY = null; // will be loaded from a local file or storage
+let API_KEY = null; // will be loaded from config.json or manual file
 
 /**
  * Normalise & deduplicate passenger names:
@@ -61,31 +60,6 @@ function saveRecords(records) {
 }
 
 /**
- * Load API key from localStorage (if previously saved).
- */
-function loadApiKeyFromStorage() {
-  try {
-    const key = localStorage.getItem(API_KEY_STORAGE_KEY);
-    if (key && typeof key === "string" && key.trim() !== "") {
-      API_KEY = key.trim();
-    }
-  } catch (e) {
-    console.error("Failed to load API key from storage", e);
-  }
-}
-
-/**
- * Save API key to localStorage for convenience (still only on this device).
- */
-function saveApiKeyToStorage(key) {
-  try {
-    localStorage.setItem(API_KEY_STORAGE_KEY, key);
-  } catch (e) {
-    console.error("Failed to save API key to storage", e);
-  }
-}
-
-/**
  * Update small status text under the API key file input.
  */
 function updateApiKeyStatus(messageOverride) {
@@ -105,7 +79,41 @@ function updateApiKeyStatus(messageOverride) {
 }
 
 /**
- * Read an API key from a user-selected file.
+ * Try to load API key automatically from config.json
+ * File must be in same folder as index.html/script.js.
+ */
+async function loadApiKeyFromConfigJson() {
+  try {
+    const res = await fetch("config.json", { cache: "no-store" });
+    if (!res.ok) {
+      console.warn("config.json not found or not readable:", res.status);
+      updateApiKeyStatus("No API key loaded yet (config.json not found).");
+      return;
+    }
+
+    const cfg = await res.json();
+    const key = (
+      (cfg && (cfg.AVIATIONSTACK_API_KEY || cfg.apiKey)) ||
+      ""
+    ).trim();
+
+    if (!key) {
+      console.warn("config.json loaded but no key field found.");
+      updateApiKeyStatus("config.json found but no key inside.");
+      return;
+    }
+
+    API_KEY = key;
+    updateApiKeyStatus("API key loaded from config.json.");
+    console.log("API key loaded from config.json");
+  } catch (e) {
+    console.error("Error reading config.json:", e);
+    updateApiKeyStatus("Could not read config.json.");
+  }
+}
+
+/**
+ * Read an API key from a user-selected file (fallback).
  * Supports:
  *  - Plain text: file contains only the key
  *  - JSON: { "AVIATIONSTACK_API_KEY": "..." } or { "apiKey": "..." }
@@ -129,8 +137,7 @@ async function loadApiKeyFromFile(file) {
   }
 
   API_KEY = key;
-  saveApiKeyToStorage(key);
-  updateApiKeyStatus();
+  updateApiKeyStatus("API key loaded from selected file.");
 }
 
 /**
@@ -232,7 +239,9 @@ function findCachedRoute(records, flightNumberRaw, flightDate) {
  */
 async function fetchRoute(flightNumberRaw) {
   if (!API_KEY) {
-    throw new Error("API key is not set. Load it from a local file first.");
+    throw new Error(
+      "API key is not set. Ensure config.json is present or load a key file."
+    );
   }
 
   // Normalize the flight number: remove spaces & uppercase
@@ -298,16 +307,18 @@ document.addEventListener("DOMContentLoaded", () => {
   renderRecords(records);
   renderPassengerSelect(records);
 
-  // Load any previously stored API key
-  loadApiKeyFromStorage();
-  updateApiKeyStatus();
+  // Initial status
+  updateApiKeyStatus("Loading API key from config.json...");
 
-  // When user selects a local file containing the API key
+  // Try to load API key automatically from config.json
+  loadApiKeyFromConfigJson();
+
+  // Optional: manual file-based key loading (fallback)
   if (apiKeyFileInput) {
     apiKeyFileInput.addEventListener("change", async (event) => {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
-      updateApiKeyStatus("Reading API key from file...");
+      updateApiKeyStatus("Reading API key from selected file...");
       try {
         await loadApiKeyFromFile(file);
       } catch (err) {
