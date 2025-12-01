@@ -13,7 +13,7 @@
       <div class="app-title-block">
         <div class="app-title">Flight Log</div>
         <div class="app-subtitle">
-          Save routes, passengers & PNRs in a clean personal log.
+          Save routes, trips, passengers & PNRs in a clean personal log.
         </div>
       </div>
     </header>
@@ -23,7 +23,7 @@
       <section class="card">
         <div class="card-header">
           <div class="card-title">New flight</div>
-          <div class="card-note">Enter details and add to your log</div>
+          <div class="card-note">Enter details and add to a trip</div>
         </div>
 
         <form id="flight-form">
@@ -72,6 +72,28 @@
 
           <div id="pax-error" class="field-error" aria-live="polite"></div>
 
+          <!-- Trip selection / creation -->
+          <div class="field-group">
+            <div class="field">
+              <label for="trip-existing">Trip</label>
+              <select id="trip-existing"></select>
+              <small>Select an existing trip, or leave empty and name a new trip.</small>
+            </div>
+
+            <div class="field">
+              <label for="trip-new-name">New Trip Name</label>
+              <input
+                id="trip-new-name"
+                type="text"
+                placeholder="Summer 2026 in Greece"
+                autocomplete="off"
+              />
+              <small>If filled, a new trip will be created.</small>
+            </div>
+          </div>
+
+          <div id="trip-error" class="field-error" aria-live="polite"></div>
+
           <div class="field-group">
             <div class="field">
               <label for="pnr">PNR Code</label>
@@ -106,7 +128,7 @@
       <!-- RIGHT: stored JSON + actions -->
       <section class="card">
         <div class="card-header">
-          <div class="card-title">Your log</div>
+          <div class="card-title">Your trips</div>
           <div class="card-note">Stored privately in this browser</div>
         </div>
 
@@ -141,7 +163,7 @@
         />
 
         <div class="json-label-row">
-          <div class="json-title">Saved Flights</div>
+          <div class="json-title">Saved Trips & Flights</div>
         </div>
         <pre id="saved-json" class="json-block">[]</pre>
       </section>
