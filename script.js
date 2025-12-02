@@ -40,7 +40,13 @@ function loadTrips() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // ensure hotels array exists
+    return parsed.map((t) => ({
+      ...t,
+      records: Array.isArray(t.records) ? t.records : [],
+      hotels: Array.isArray(t.hotels) ? t.hotels : []
+    }));
   } catch (e) {
     console.error("Failed to parse stored trips", e);
     return [];
@@ -85,13 +91,20 @@ async function loadApiKeyFromConfigJson() {
   }
 }
 
-// Aggregate passengers from all trips/records
+// Aggregate passengers from all trips/records/hotels
 function getAllPassengers(trips) {
   const all = [];
   for (const trip of trips) {
-    if (!trip || !Array.isArray(trip.records)) continue;
-    for (const rec of trip.records) {
-      if (Array.isArray(rec.paxNames)) all.push(...rec.paxNames);
+    if (!trip) continue;
+    if (Array.isArray(trip.records)) {
+      for (const rec of trip.records) {
+        if (Array.isArray(rec.paxNames)) all.push(...rec.paxNames);
+      }
+    }
+    if (Array.isArray(trip.hotels)) {
+      for (const h of trip.hotels) {
+        if (Array.isArray(h.paxNames)) all.push(...h.paxNames);
+      }
     }
   }
   const unique = normalizePassengerNames(all);
@@ -122,6 +135,45 @@ function renderPassengerSelect(trips) {
     opt.textContent = name;
     select.appendChild(opt);
   });
+}
+
+// Collect unique hotel names across all trips
+function getAllHotelNames(trips) {
+  const set = new Set();
+  for (const trip of trips) {
+    if (!trip || !Array.isArray(trip.hotels)) continue;
+    for (const h of trip.hotels) {
+      if (h && typeof h.hotelName === "string" && h.hotelName.trim()) {
+        set.add(h.hotelName.trim());
+      }
+    }
+  }
+  const names = Array.from(set);
+  names.sort((a, b) => a.localeCompare(b));
+  return names;
+}
+
+function renderHotelSelect(trips) {
+  const select = document.getElementById("hotel-existing");
+  if (!select) return;
+
+  const names = getAllHotelNames(trips);
+
+  select.innerHTML = "";
+
+  const optNew = document.createElement("option");
+  optNew.value = "__new__";
+  optNew.textContent = "New hotel";
+  select.appendChild(optNew);
+
+  names.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+
+  select.value = "__new__";
 }
 
 // Adjust ISO string date to a new YYYY-MM-DD, keeping time & timezone
@@ -184,6 +236,25 @@ function formatDuration(mins) {
   if (h && m) return `${h}h ${m}m`;
   if (h) return `${h}h`;
   return `${m}m`;
+}
+
+// Hotel helpers
+function computeNights(checkIn, checkOut) {
+  if (!checkIn || !checkOut) return null;
+  const d1 = new Date(checkIn + "T00:00:00");
+  const d2 = new Date(checkOut + "T00:00:00");
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return null;
+  const diffMs = d2.getTime() - d1.getTime();
+  return Math.round(diffMs / (24 * 60 * 60 * 1000));
+}
+
+function generateHotelId() {
+  return (
+    "H-" +
+    Date.now().toString(36).toUpperCase() +
+    "-" +
+    Math.random().toString(36).substring(2, 6).toUpperCase()
+  );
 }
 
 // Find cached route across all trips by flight number (optionally preferring same date)
@@ -257,13 +328,9 @@ async function fetchRoute(flightNumberRaw) {
 
 function renderTripsJson(trips) {
   const savedEl = document.getElementById("saved-json");
-  if (!savedEl) {
-    // No JSON debug view in the UI any more; nothing to render.
-    return;
-  }
+  if (!savedEl) return;
   savedEl.textContent = JSON.stringify(trips, null, 2);
 }
-
 
 function renderTripSelect(trips, activeTripId) {
   const select = document.getElementById("trip-existing");
@@ -309,10 +376,12 @@ function renderTripFlights(trip, containerEl, summaryEl) {
     return;
   }
 
-  const records = Array.isArray(trip.records) ? trip.records.slice().sort((a, b) => {
-    if (!a.flightDate || !b.flightDate) return 0;
-    return a.flightDate.localeCompare(b.flightDate);
-  }) : [];
+  const records = Array.isArray(trip.records)
+    ? trip.records.slice().sort((a, b) => {
+        if (!a.flightDate || !b.flightDate) return 0;
+        return a.flightDate.localeCompare(b.flightDate);
+      })
+    : [];
 
   if (summaryEl) {
     const count = records.length;
@@ -403,6 +472,85 @@ function renderTripFlights(trip, containerEl, summaryEl) {
   }
 }
 
+function renderTripHotels(trip, containerEl, summaryEl) {
+  containerEl.innerHTML = "";
+
+  if (!trip) {
+    const empty = document.createElement("div");
+    empty.className = "tiles-empty";
+    empty.textContent = "Select a trip to see its hotels.";
+    containerEl.appendChild(empty);
+    if (summaryEl) summaryEl.textContent = "No trip selected";
+    return;
+  }
+
+  const hotels = Array.isArray(trip.hotels)
+    ? trip.hotels.slice().sort((a, b) => {
+        if (!a.checkInDate || !b.checkInDate) return 0;
+        return a.checkInDate.localeCompare(b.checkInDate);
+      })
+    : [];
+
+  if (summaryEl) {
+    const count = hotels.length;
+    summaryEl.textContent =
+      count === 0
+        ? `${trip.name} • no hotels yet`
+        : `${trip.name} • ${count} hotel${count > 1 ? "s" : ""}`;
+  }
+
+  if (hotels.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tiles-empty";
+    empty.textContent = "No hotels in this trip yet. Use “Add hotel” to create one.";
+    containerEl.appendChild(empty);
+    return;
+  }
+
+  for (const h of hotels) {
+    const tile = document.createElement("div");
+    tile.className = "hotel-tile";
+
+    const checkInLabel = formatFriendlyDate(h.checkInDate);
+    const checkOutLabel = formatFriendlyDate(h.checkOutDate);
+    const nights = computeNights(h.checkInDate, h.checkOutDate);
+    const pax = h.paxCount || 1;
+    const payment = h.paymentType || "prepaid";
+    const bookingId = h.id || "—";
+
+    const paymentBadgeClass =
+      payment === "prepaid" ? "hotel-badge-paid" : "hotel-badge-pay-hotel";
+    const paymentText =
+      payment === "prepaid" ? "Already paid" : "Pay at hotel";
+
+    tile.innerHTML = `
+      <div class="hotel-tile-header">
+        <div class="hotel-name">${h.hotelName || "Unnamed hotel"}</div>
+        <div class="hotel-dates">
+          ${checkInLabel || "?"} – ${checkOutLabel || "?"}
+        </div>
+      </div>
+
+      <div class="hotel-main">
+        <div class="hotel-main-left">
+          <div>${nights != null ? `${nights} night${nights === 1 ? "" : "s"}` : ""}</div>
+          <div>${pax} guest${pax === 1 ? "" : "s"}</div>
+        </div>
+        <div class="hotel-main-right">
+          <span class="${paymentBadgeClass}">${paymentText}</span>
+        </div>
+      </div>
+
+      <div class="hotel-footer">
+        <span>Booking ID: <strong>${bookingId}</strong></span>
+        <span>Trip: ${trip.name}</span>
+      </div>
+    `;
+
+    containerEl.appendChild(tile);
+  }
+}
+
 // =========================
 // App bootstrap
 // =========================
@@ -412,17 +560,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const tripSelect = document.getElementById("trip-existing");
   const tripNewInput = document.getElementById("trip-new-name");
   const tripErrorEl = document.getElementById("trip-error");
+
   const tripFlightsList = document.getElementById("trip-flights-list");
   const tripFlightsSummary = document.getElementById("trip-flights-summary");
 
+  const tripHotelsList = document.getElementById("trip-hotels-list");
+  const tripHotelsSummary = document.getElementById("trip-hotels-summary");
+
   const addFlightBtn = document.getElementById("add-flight-btn");
   const flightOverlay = document.getElementById("flight-overlay");
-  const overlayCloseBtn = document.getElementById("close-flight-overlay");
+  const flightOverlayCloseBtn = document.getElementById("close-flight-overlay");
   const cancelFlightBtn = document.getElementById("cancel-flight-btn");
   const flightCard = document.querySelector(".card-flight");
 
-  const form = document.getElementById("flight-form");
-  const submitBtn = form.querySelector('button[type="submit"]');
+  const addHotelBtn = document.getElementById("add-hotel-btn");
+  const hotelOverlay = document.getElementById("hotel-overlay");
+  const hotelOverlayCloseBtn = document.getElementById("close-hotel-overlay");
+  const cancelHotelBtn = document.getElementById("cancel-hotel-btn");
+  const hotelCard = document.querySelector(".card-hotel");
+
+  // Flight form elements
+  const flightForm = document.getElementById("flight-form");
+  const flightSubmitBtn = flightForm.querySelector('button[type="submit"]');
   const outputEl = document.getElementById("output");
   const inputFlight = document.getElementById("flight-number");
   const inputDate = document.getElementById("flight-date");
@@ -434,6 +593,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const flightDateErrorEl = document.getElementById("flight-date-error");
   const paxErrorEl = document.getElementById("pax-error");
 
+  // Hotel form elements
+  const hotelForm = document.getElementById("hotel-form");
+  const hotelSubmitBtn = hotelForm.querySelector('button[type="submit"]');
+  const hotelExistingSelect = document.getElementById("hotel-existing");
+  const hotelNameInput = document.getElementById("hotel-name");
+  const hotelPaxInput = document.getElementById("hotel-pax");
+  const hotelCheckinInput = document.getElementById("hotel-checkin");
+  const hotelCheckoutInput = document.getElementById("hotel-checkout");
+  const hotelPaymentSelect = document.getElementById("hotel-payment");
+  const hotelIdInput = document.getElementById("hotel-id");
+
+  const hotelNameError = document.getElementById("hotel-name-error");
+  const hotelPaxError = document.getElementById("hotel-pax-error");
+  const hotelDatesError = document.getElementById("hotel-dates-error");
+
+  // Import / export / clear
   const importBtn = document.getElementById("import-json");
   const importFile = document.getElementById("import-json-file");
   const downloadBtn = document.getElementById("download-json");
@@ -446,8 +621,10 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTripsJson(trips);
   renderTripSelect(trips, activeTripId);
   renderPassengerSelect(trips);
+  renderHotelSelect(trips);
   const initialTrip = trips.find((t) => String(t.id) === String(activeTripId)) || null;
   renderTripFlights(initialTrip, tripFlightsList, tripFlightsSummary);
+  renderTripHotels(initialTrip, tripHotelsList, tripHotelsSummary);
 
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
@@ -462,15 +639,26 @@ document.addEventListener("DOMContentLoaded", () => {
     return false;
   }
 
-  function closeOverlay() {
+  function closeFlightOverlay() {
     flightOverlay.classList.add("hidden");
     flightOverlay.setAttribute("aria-hidden", "true");
   }
 
-  function openOverlay() {
+  function openFlightOverlay() {
     flightOverlay.classList.remove("hidden");
     flightOverlay.setAttribute("aria-hidden", "false");
     flightCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function closeHotelOverlay() {
+    hotelOverlay.classList.add("hidden");
+    hotelOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function openHotelOverlay() {
+    hotelOverlay.classList.remove("hidden");
+    hotelOverlay.setAttribute("aria-hidden", "false");
+    hotelCard.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function updateAddFlightState() {
@@ -480,7 +668,18 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       addFlightBtn.disabled = true;
       tripErrorEl.textContent = "Choose an existing trip or enter a new trip name.";
-      closeOverlay();
+      closeFlightOverlay();
+    }
+  }
+
+  function updateAddHotelState() {
+    if (hasTripChoice()) {
+      addHotelBtn.disabled = false;
+      tripErrorEl.textContent = "";
+    } else {
+      addHotelBtn.disabled = true;
+      tripErrorEl.textContent = "Choose an existing trip or enter a new trip name.";
+      closeHotelOverlay();
     }
   }
 
@@ -501,7 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter(Boolean);
   }
 
-  function validateFormState() {
+  function validateFlightFormState() {
     let ok = true;
 
     const flightRaw = inputFlight.value.trim();
@@ -545,10 +744,63 @@ document.addEventListener("DOMContentLoaded", () => {
       paxErrorEl.textContent = "";
     }
 
-    submitBtn.disabled = !ok;
+    flightSubmitBtn.disabled = !ok;
   }
 
-  // --- Event wiring ---
+  // --- Hotel form validation ---
+
+  function validateHotelFormState() {
+    let ok = true;
+
+    const existingVal = hotelExistingSelect.value;
+    const newName = hotelNameInput.value.trim();
+    const paxRaw = hotelPaxInput.value.trim();
+    const checkIn = hotelCheckinInput.value;
+    const checkOut = hotelCheckoutInput.value;
+
+    if (!hasTripChoice()) {
+      ok = false;
+      tripErrorEl.textContent = "Choose an existing trip or enter a new trip name.";
+    } else {
+      tripErrorEl.textContent = "";
+    }
+
+    // Hotel name choice
+    if ((!existingVal || existingVal === "__new__") && !newName) {
+      ok = false;
+      hotelNameError.textContent = "Select an existing hotel or enter a new name.";
+    } else if (existingVal && existingVal !== "__new__" && newName) {
+      ok = false;
+      hotelNameError.textContent =
+        "Choose either an existing hotel or a new name, not both.";
+    } else {
+      hotelNameError.textContent = "";
+    }
+
+    // Pax
+    const pax = Number(paxRaw || "0");
+    if (!pax || pax < 1) {
+      ok = false;
+      hotelPaxError.textContent = "Number of guests must be at least 1.";
+    } else {
+      hotelPaxError.textContent = "";
+    }
+
+    // Dates
+    if (!checkIn || !checkOut) {
+      ok = false;
+      hotelDatesError.textContent = "Please enter both check-in and check-out dates.";
+    } else if (checkOut < checkIn) {
+      ok = false;
+      hotelDatesError.textContent = "Check-out must be after check-in.";
+    } else {
+      hotelDatesError.textContent = "";
+    }
+
+    hotelSubmitBtn.disabled = !ok;
+  }
+
+  // --- Event wiring: trip selection ---
 
   tripSelect.addEventListener("change", () => {
     const val = tripSelect.value;
@@ -557,30 +809,36 @@ document.addEventListener("DOMContentLoaded", () => {
       tripNewInput.value = "";
       const trip = trips.find((t) => String(t.id) === String(activeTripId)) || null;
       renderTripFlights(trip, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(trip, tripHotelsList, tripHotelsSummary);
     } else {
       activeTripId = null;
       renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     }
     updateAddFlightState();
-    validateFormState();
+    updateAddHotelState();
+    validateFlightFormState();
+    validateHotelFormState();
   });
 
   tripNewInput.addEventListener("input", () => {
-    // Ensure select shows "New trip"
     if (tripSelect.value !== "__new__") {
       tripSelect.value = "__new__";
       activeTripId = null;
       renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     }
     updateAddFlightState();
-    validateFormState();
+    updateAddHotelState();
+    validateFlightFormState();
+    validateHotelFormState();
   });
 
-  // Add flight button shows the overlay
+  // --- Add flight button => open overlay ---
+
   addFlightBtn.addEventListener("click", () => {
     if (addFlightBtn.disabled) return;
 
-    // reset flight-specific fields
     inputFlight.value = "";
     inputDate.value = "";
     inputPaxNew.value = "";
@@ -589,39 +847,33 @@ document.addEventListener("DOMContentLoaded", () => {
       Array.from(selectPaxExisting.options).forEach((opt) => (opt.selected = false));
     }
     outputEl.textContent = "{}";
-    validateFormState();
 
-    openOverlay();
+    validateFlightFormState();
+    openFlightOverlay();
     inputFlight.focus();
   });
 
-  overlayCloseBtn.addEventListener("click", () => {
-    closeOverlay();
-  });
+  flightOverlayCloseBtn.addEventListener("click", closeFlightOverlay);
+  cancelFlightBtn.addEventListener("click", closeFlightOverlay);
 
-  cancelFlightBtn.addEventListener("click", () => {
-    closeOverlay();
-  });
-
-  // Close overlay when clicking backdrop
   flightOverlay.addEventListener("click", (e) => {
     if (e.target === flightOverlay || e.target.classList.contains("overlay-backdrop")) {
-      closeOverlay();
+      closeFlightOverlay();
     }
   });
 
   // Flight form inputs -> validation
-  inputFlight.addEventListener("input", validateFormState);
-  inputDate.addEventListener("change", validateFormState);
-  selectPaxExisting.addEventListener("change", validateFormState);
-  inputPaxNew.addEventListener("input", validateFormState);
+  inputFlight.addEventListener("input", validateFlightFormState);
+  inputDate.addEventListener("change", validateFlightFormState);
+  selectPaxExisting.addEventListener("change", validateFlightFormState);
+  inputPaxNew.addEventListener("input", validateFlightFormState);
 
-  // --- Form submit: fetch/choose route & save record ---
+  // --- Flight form submit ---
 
-  form.addEventListener("submit", async (event) => {
+  flightForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    validateFormState();
-    if (submitBtn.disabled) return;
+    validateFlightFormState();
+    if (flightSubmitBtn.disabled) return;
 
     const flightNumberRaw = inputFlight.value.trim();
     const flightDate = inputDate.value;
@@ -641,7 +893,8 @@ document.addEventListener("DOMContentLoaded", () => {
         id: Date.now(),
         name: newName,
         createdAt: new Date().toISOString(),
-        records: []
+        records: [],
+        hotels: []
       };
       trips.push(newTrip);
       currentTrip = newTrip;
@@ -708,13 +961,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Save into trip
     currentTrip.records = currentTrip.records || [];
+    currentTrip.hotels = currentTrip.hotels || [];
     currentTrip.records.push(record);
 
     // Persist & re-render
     saveTrips(trips);
     renderTripsJson(trips);
     renderPassengerSelect(trips);
+    renderHotelSelect(trips);
     renderTripFlights(currentTrip, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(currentTrip, tripHotelsList, tripHotelsSummary);
 
     // Clear flight fields
     inputFlight.value = "";
@@ -724,18 +980,129 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!selectPaxExisting.disabled) {
       Array.from(selectPaxExisting.options).forEach((opt) => (opt.selected = false));
     }
-    validateFormState();
+    validateFlightFormState();
 
-    // Hide overlay until user chooses "Add flight" again
-    closeOverlay();
+    closeFlightOverlay();
 
-    // Alert summary
     alert(
       `Saved flight to trip "${currentTrip.name}":\n` +
         `• Flight: ${normalizeFlightNumber(flightNumberRaw)} on ${flightDate}\n` +
         `• Passengers: ${paxNames.join(", ")}\n` +
         (record.pnr ? `• PNR: ${record.pnr}\n` : "") +
         `Source: ${routeSource === "cache" ? "existing route" : "API"}`
+    );
+  });
+
+  // --- Add hotel button => open overlay ---
+
+  addHotelBtn.addEventListener("click", () => {
+    if (addHotelBtn.disabled) return;
+
+    hotelExistingSelect.value = "__new__";
+    hotelNameInput.value = "";
+    hotelPaxInput.value = "1";
+    hotelCheckinInput.value = "";
+    hotelCheckoutInput.value = "";
+    hotelPaymentSelect.value = "prepaid";
+    hotelIdInput.value = "";
+
+    hotelNameError.textContent = "";
+    hotelPaxError.textContent = "";
+    hotelDatesError.textContent = "";
+    validateHotelFormState();
+
+    openHotelOverlay();
+    hotelNameInput.focus();
+  });
+
+  hotelOverlayCloseBtn.addEventListener("click", closeHotelOverlay);
+  cancelHotelBtn.addEventListener("click", closeHotelOverlay);
+
+  hotelOverlay.addEventListener("click", (e) => {
+    if (e.target === hotelOverlay || e.target.classList.contains("overlay-backdrop")) {
+      closeHotelOverlay();
+    }
+  });
+
+  // Hotel form inputs -> validation
+  hotelExistingSelect.addEventListener("change", validateHotelFormState);
+  hotelNameInput.addEventListener("input", validateHotelFormState);
+  hotelPaxInput.addEventListener("input", validateHotelFormState);
+  hotelCheckinInput.addEventListener("change", validateHotelFormState);
+  hotelCheckoutInput.addEventListener("change", validateHotelFormState);
+  hotelPaymentSelect.addEventListener("change", validateHotelFormState);
+  hotelIdInput.addEventListener("input", validateHotelFormState);
+
+  // --- Hotel form submit ---
+
+  hotelForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    validateHotelFormState();
+    if (hotelSubmitBtn.disabled) return;
+
+    const existingVal = hotelExistingSelect.value;
+    const newNameRaw = hotelNameInput.value.trim();
+    const pax = Number(hotelPaxInput.value.trim() || "1");
+    const checkIn = hotelCheckinInput.value;
+    const checkOut = hotelCheckoutInput.value;
+    const paymentType = hotelPaymentSelect.value || "prepaid";
+    const enteredId = hotelIdInput.value.trim();
+
+    // Decide hotel name: new overrides existing
+    let hotelName = newNameRaw;
+    if (!hotelName) {
+      if (existingVal && existingVal !== "__new__") {
+        hotelName = existingVal;
+      }
+    }
+
+    let currentTrip =
+      trips.find((t) => String(t.id) === String(activeTripId)) || null;
+
+    if (!currentTrip) {
+      const newTripName = tripNewInput.value.trim() || "New trip";
+      const newTrip = {
+        id: Date.now(),
+        name: newTripName,
+        createdAt: new Date().toISOString(),
+        records: [],
+        hotels: []
+      };
+      trips.push(newTrip);
+      currentTrip = newTrip;
+      activeTripId = newTrip.id;
+      renderTripSelect(trips, activeTripId);
+    }
+
+    currentTrip.hotels = currentTrip.hotels || [];
+
+    const hotelRecord = {
+      id: enteredId || generateHotelId(),
+      createdAt: new Date().toISOString(),
+      hotelName,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      paxCount: pax,
+      paymentType
+    };
+
+    currentTrip.hotels.push(hotelRecord);
+
+    saveTrips(trips);
+    renderTripsJson(trips);
+    renderPassengerSelect(trips);
+    renderHotelSelect(trips);
+    renderTripFlights(currentTrip, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(currentTrip, tripHotelsList, tripHotelsSummary);
+
+    closeHotelOverlay();
+
+    alert(
+      `Saved hotel to trip "${currentTrip.name}":\n` +
+        `• ${hotelName}\n` +
+        `• ${checkIn} → ${checkOut} (${pax} guest${pax === 1 ? "" : "s"})\n` +
+        `• Booking ID: ${hotelRecord.id}\n` +
+        `• Payment: ${paymentType === "prepaid" ? "Already paid" : "Pay at hotel"}`
     );
   });
 
@@ -769,16 +1136,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!Array.isArray(parsed)) {
           throw new Error("Imported JSON must be an array of trips.");
         }
-        trips = parsed;
+        trips = parsed.map((t) => ({
+          ...t,
+          records: Array.isArray(t.records) ? t.records : [],
+          hotels: Array.isArray(t.hotels) ? t.hotels : []
+        }));
         activeTripId = trips.length ? trips[0].id : null;
         saveTrips(trips);
         renderTripsJson(trips);
         renderTripSelect(trips, activeTripId);
         renderPassengerSelect(trips);
+        renderHotelSelect(trips);
         const trip =
           trips.find((t) => String(t.id) === String(activeTripId)) || null;
         renderTripFlights(trip, tripFlightsList, tripFlightsSummary);
+        renderTripHotels(trip, tripHotelsList, tripHotelsSummary);
         updateAddFlightState();
+        updateAddHotelState();
         alert("Trips imported successfully.");
       } catch (err) {
         console.error("Import error:", err);
@@ -791,18 +1165,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   clearBtn.addEventListener("click", () => {
-    if (!confirm("Clear all trips and flights from this device?")) return;
+    if (!confirm("Clear all trips, flights and hotels from this device?")) return;
     trips = [];
     activeTripId = null;
     saveTrips(trips);
     renderTripsJson(trips);
     renderTripSelect(trips, activeTripId);
     renderPassengerSelect(trips);
+    renderHotelSelect(trips);
     renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     updateAddFlightState();
+    updateAddHotelState();
   });
 
   // Final initial validation state
   updateAddFlightState();
-  validateFormState();
+  updateAddHotelState();
+  validateFlightFormState();
+  validateHotelFormState();
 });
