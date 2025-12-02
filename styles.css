@@ -53,6 +53,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   padding: 16px 22px;
   border-radius: 999px;
   background: rgba(255,255,255,0.9);
@@ -72,6 +73,7 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 
 .topbar-icon {
@@ -86,34 +88,42 @@ body {
   color: #fff;
   font-weight: 600;
   font-size: 22px;
+  flex-shrink: 0;
 }
 
 .topbar-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .topbar-title {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .topbar-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 14px;
+  flex-shrink: 0;
 }
 
 .topbar-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: nowrap;
 }
 
 /* Layout */
@@ -420,6 +430,7 @@ small {
 .api-status-text {
   font-size: 11px;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 /* Subtle inline error text */
@@ -969,7 +980,65 @@ small {
   text-overflow: ellipsis;
 }
 
-
 .overlay-actions {
   justify-content: flex-end;
+}
+
+/* ---------- Mobile layout for top bar ---------- */
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 18px 12px 32px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 14px 12px;
+    border-radius: 24px;
+  }
+
+  .topbar-left {
+    justify-content: flex-start;
+  }
+
+  .topbar-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+
+  .topbar-title {
+    font-size: 20px;
+  }
+
+  .topbar-subtitle {
+    font-size: 12px;
+    white-space: normal; /* allow wrapping on mobile */
+  }
+
+  .topbar-right {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .api-status-text {
+    white-space: normal;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .topbar-actions .btn-xs {
+    flex: 1 1 30%;
+    justify-content: center;
+  }
 }
