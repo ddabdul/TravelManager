@@ -480,6 +480,138 @@ small {
   margin-top: 8px;
 }
 
+/* Slightly denser card for itineraries */
+.itinerary-tile {
+  padding: 14px 16px 12px;
+}
+
+/* Container for stacked segments (departure, layover, connecting, etc.) */
+.itinerary-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Individual segment “pills” – glassy cards inside the main tile */
+.itinerary-segment {
+  border-radius: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  background: rgba(244, 244, 248, 0.9);
+}
+
+.segment-flight {
+  /* nothing extra yet, but left for future tweaks */
+}
+
+.segment-layover {
+  background: rgba(244, 244, 248, 0.8);
+}
+
+@media (prefers-color-scheme: dark) {
+  .itinerary-segment {
+    background: rgba(28, 28, 30, 0.9);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+  .segment-layover {
+    background: rgba(44, 44, 46, 0.9);
+  }
+}
+
+/* Segment header: label (DEPARTURE / LAYOVER / CONNECTING FLIGHT) + small code */
+.segment-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.segment-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.segment-flight-code {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.segment-icon {
+  font-size: 13px;
+}
+
+/* Main row inside a flight segment: origin → dest */
+.segment-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.segment-side {
+  min-width: 0;
+}
+
+.segment-side-right {
+  text-align: right;
+}
+
+.segment-city {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segment-code-time {
+  margin-top: 2px;
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.segment-code {
+  font-weight: 600;
+}
+
+.segment-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.segment-arrow {
+  flex: 0 0 28px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.segment-plane-icon {
+  font-size: 14px;
+}
+
+/* Layover copy */
+.segment-layover-text {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Header-left (date + icon) already existed but we ensure flex layout works nicely */
+.flight-tile-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+
 /* Trip name “tile” */
 
 .trip-name-summary {
