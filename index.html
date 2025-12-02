@@ -273,7 +273,7 @@
     </section>
   </div>
 
-  <!-- Hotel overlay (New hotel form) -->
+   <!-- Hotel overlay (New hotel form) -->
   <div id="hotel-overlay" class="overlay hidden" aria-hidden="true">
     <div class="overlay-backdrop"></div>
 
@@ -297,19 +297,29 @@
       </div>
 
       <form id="hotel-form">
+        <!-- Existing vs new hotel -->
         <div class="field-group">
           <div class="field">
-            <label for="hotel-name">Hotel name</label>
+            <label for="hotel-existing">Existing hotel</label>
+            <select id="hotel-existing"></select>
+            <small>Select a previously saved hotel or leave on “New hotel” and type a name.</small>
+          </div>
+
+          <div class="field">
+            <label for="hotel-name">New hotel name</label>
             <input
               id="hotel-name"
               type="text"
               placeholder="Four Seasons Athens"
               autocomplete="off"
-              required
             />
-            <div id="hotel-name-error" class="field-error" aria-live="polite"></div>
+            <small>If filled, a new hotel will be created.</small>
           </div>
+        </div>
+        <div id="hotel-name-error" class="field-error" aria-live="polite"></div>
 
+        <!-- Pax + dates -->
+        <div class="field-group">
           <div class="field">
             <label for="hotel-pax">Number of guests</label>
             <input
@@ -322,20 +332,18 @@
             />
             <div id="hotel-pax-error" class="field-error" aria-live="polite"></div>
           </div>
-        </div>
 
-        <div class="field-group">
           <div class="field">
-            <label for="hotel-checkin">Check-in</label>
-            <input id="hotel-checkin" type="date" />
-          </div>
-          <div class="field">
-            <label for="hotel-checkout">Check-out</label>
-            <input id="hotel-checkout" type="date" />
+            <label>Stay dates</label>
+            <div class="field-group" style="grid-template-columns: repeat(2,minmax(0,1fr)); gap:6px;">
+              <input id="hotel-checkin" type="date" />
+              <input id="hotel-checkout" type="date" />
+            </div>
+            <div id="hotel-dates-error" class="field-error" aria-live="polite"></div>
           </div>
         </div>
-        <div id="hotel-dates-error" class="field-error" aria-live="polite"></div>
 
+        <!-- Payment + booking id -->
         <div class="field-group">
           <div class="field">
             <label for="hotel-payment">Payment</label>
@@ -370,6 +378,7 @@
       </form>
     </section>
   </div>
+
 
   <script src="script.js"></script>
 </body>
