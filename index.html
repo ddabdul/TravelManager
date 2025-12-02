@@ -205,12 +205,96 @@
             <input
               id="pnr"
               type="text"
-              maxlength="6"
-              placeholder="ABC123"
+              placeholder="ABC123, 1234567890…"
               autocomplete="off"
             />
-            <small>Optional 6-character booking reference.</small>
+            <small>Optional booking reference (any length).</small>
+
           </div>
+        </div>
+
+        <!-- Manual route – shown when API can't find the flight -->
+        <div id="manual-route-section" class="manual-route hidden">
+          <div class="manual-route-header">
+            Manual route details
+          </div>
+        
+          <div class="field-group">
+            <div class="field">
+              <label for="manual-airline">Airline</label>
+              <input
+                id="manual-airline"
+                type="text"
+                placeholder="British Airways"
+                autocomplete="off"
+              />
+            </div>
+        
+            <div class="field">
+              <label for="manual-flight-number">Flight number (override, optional)</label>
+              <input
+                id="manual-flight-number"
+                type="text"
+                placeholder="EZY8449"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+        
+          <div class="field-group">
+            <div class="field">
+              <label for="manual-dep-airport">Departure airport (name)</label>
+              <input
+                id="manual-dep-airport"
+                type="text"
+                placeholder="Larnaca"
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="manual-dep-iata">Departure IATA code</label>
+              <input
+                id="manual-dep-iata"
+                type="text"
+                placeholder="LCA"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+        
+          <div class="field-group">
+            <div class="field">
+              <label for="manual-dep-time">Departure time</label>
+              <input id="manual-dep-time" type="time" />
+            </div>
+            <div class="field">
+              <label for="manual-arr-time">Arrival time</label>
+              <input id="manual-arr-time" type="time" />
+            </div>
+          </div>
+        
+          <div class="field-group">
+            <div class="field">
+              <label for="manual-arr-airport">Arrival airport (name)</label>
+              <input
+                id="manual-arr-airport"
+                type="text"
+                placeholder="London Gatwick"
+                autocomplete="off"
+              />
+            </div>
+            <div class="field">
+              <label for="manual-arr-iata">Arrival IATA code</label>
+              <input
+                id="manual-arr-iata"
+                type="text"
+                placeholder="LGW"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+        
+          <div id="manual-route-error" class="field-error" aria-live="polite"></div>
         </div>
 
         <!-- Submit -->
