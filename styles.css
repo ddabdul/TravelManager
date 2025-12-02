@@ -785,6 +785,58 @@ small {
   margin-bottom: 6px;
 }
 
+.flight-tile-header-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+}
+
+.event-type-icon-flight {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.event-type-icon-hotel {
+  background: rgba(52,199,89,0.16);
+  color: #34c759;
+}
+
+/* Multi-leg detail lines inside a grouped flight tile */
+.flight-legs-list {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.flight-leg-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.flight-leg-left,
+.flight-leg-right {
+  white-space: nowrap;
+}
+
+.flight-leg-middle {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 
 .overlay-actions {
   justify-content: flex-end;
