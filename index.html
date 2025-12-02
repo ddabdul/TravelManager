@@ -69,7 +69,6 @@
                 <div class="card-title">Trip selection</div>
                 <div class="card-subtitle">Step 1 – choose or create a trip</div>
               </div>
-              <span class="chip">Step 1</span>
             </div>
 
             <div class="field-group">
@@ -96,71 +95,35 @@
             <div id="trip-error" class="field-error" aria-live="polite"></div>
           </div>
 
-          <!-- Flights in selected trip (tiles) -->
-          <div class="card card-tiles">
-            <div class="card-header tiles-header-row">
-              <div class="tiles-header-left">
-                <div class="card-title">Flights in this trip</div>
-                <div class="card-subtitle">
-                  Saved flights appear as tiles below.
-                </div>
-              </div>
-
-              <div class="tiles-header-center">
-                <span id="trip-flights-summary" class="chip chip-soft">
-                  No trip selected
-                </span>
-              </div>
-
-              <div class="tiles-header-right">
-                <button id="add-flight-btn" class="btn btn-primary btn-small" disabled>
-                  <span class="btn-icon">＋</span>
-                  <span>Add flight</span>
-                </button>
-              </div>
-            </div>
-
-            <div id="trip-flights-list" class="tiles-grid">
-              <div class="tiles-empty">
-                Select an existing trip or enter a new trip name to see flights here.
-              </div>
-            </div>
-          </div>
-
-          <!-- Hotels in selected trip (tiles) -->
-          <div class="card card-hotels">
-            <div class="card-header hotels-header-row">
-              <div class="hotels-header-left">
-                <div class="card-title">Hotels in this trip</div>
-                <div class="card-subtitle">
-                  Track stays and booking confirmations.
-                </div>
-              </div>
-
-              <div class="hotels-header-center">
-                <span id="trip-hotels-summary" class="chip chip-soft">
-                  No trip selected
-                </span>
-              </div>
-
-              <div class="hotels-header-right">
-                <button id="add-hotel-btn" class="btn btn-primary btn-small" disabled>
-                  <span class="btn-icon">＋</span>
-                  <span>Add hotel</span>
-                </button>
-              </div>
-            </div>
-
-            <div id="trip-hotels-list" class="tiles-grid">
-              <div class="tiles-empty">
-                Select a trip to see its hotel bookings.
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
+        <!-- Events in this trip: flights + hotels mixed -->
+<div class="tiles-section">
+  <div class="tiles-header-row">
+    <div class="tiles-title">Events in this trip</div>
+    <span id="trip-events-summary" class="tag-soft">
+      No trip selected
+    </span>
   </div>
+
+  <div class="tiles-header-row tiles-header-row-bottom">
+    <div id="trip-name-summary" class="trip-name-summary"></div>
+    <div class="tiles-header-actions">
+      <button id="add-hotel-btn" class="btn btn-ghost" disabled>
+        <span class="btn-icon">🏨</span>
+        <span>Add hotel</span>
+      </button>
+      <button id="add-flight-btn" class="btn btn-primary" disabled>
+        <span class="btn-icon">✈︎</span>
+        <span>Add flight</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="trip-events-list" class="tiles-grid">
+    <div class="tiles-empty">
+      Select an existing trip or enter a new trip name to see events here.
+    </div>
+  </div>
+</div>
 
   <!-- Flight overlay (New flight form) -->
   <div id="flight-overlay" class="overlay hidden" aria-hidden="true">
