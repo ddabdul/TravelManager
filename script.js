@@ -41,7 +41,6 @@ function loadTrips() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    // ensure arrays exist
     return parsed.map((t) => ({
       ...t,
       records: Array.isArray(t.records) ? t.records : [],
@@ -114,6 +113,7 @@ function getAllPassengers(trips) {
 
 function renderPassengerSelect(trips) {
   const select = document.getElementById("pax-existing");
+  if (!select) return;
   const passengers = getAllPassengers(trips);
 
   select.innerHTML = "";
@@ -485,7 +485,10 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
       tile.innerHTML = `
         <div class="flight-tile-header">
-          <span class="flight-date">${dateLabel}</span>
+          <div class="flight-tile-header-left">
+            <span class="event-type-icon event-type-icon-flight">✈︎</span>
+            <span class="flight-date">${dateLabel}</span>
+          </div>
           <span class="flight-airline">${airlineLabel || "Flight"}</span>
         </div>
 
@@ -532,7 +535,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     } else if (evt.type === "hotel") {
       const h = evt.hotel;
       const tile = document.createElement("div");
-      tile.className = "flight-tile"; // reuse same tile style
+      tile.className = "flight-tile"; // reuse same card style
 
       const checkInLabel = formatFriendlyDate(h.checkInDate);
       const checkOutLabel = formatFriendlyDate(h.checkOutDate);
@@ -549,7 +552,10 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
       tile.innerHTML = `
         <div class="flight-tile-header">
-          <span class="flight-date">${checkInLabel}</span>
+          <div class="flight-tile-header-left">
+            <span class="event-type-icon event-type-icon-hotel">🏨</span>
+            <span class="flight-date">${checkInLabel}</span>
+          </div>
           <span class="flight-airline">Hotel • ${h.hotelName || "Unnamed"}</span>
         </div>
 
@@ -726,6 +732,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Flight form validation ---
 
   function getSelectedExistingPassengers() {
+    if (!selectPaxExisting || selectPaxExisting.disabled) return [];
     return Array.from(selectPaxExisting.selectedOptions || [])
       .map((opt) => opt.value)
       .filter(Boolean);
