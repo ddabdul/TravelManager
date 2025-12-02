@@ -257,8 +257,13 @@ async function fetchRoute(flightNumberRaw) {
 
 function renderTripsJson(trips) {
   const savedEl = document.getElementById("saved-json");
+  if (!savedEl) {
+    // No JSON debug view in the UI any more; nothing to render.
+    return;
+  }
   savedEl.textContent = JSON.stringify(trips, null, 2);
 }
+
 
 function renderTripSelect(trips, activeTripId) {
   const select = document.getElementById("trip-existing");
