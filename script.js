@@ -715,7 +715,6 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           <div class="airport-info">
             <div class="airport-code">CHECK-IN</div>
             <div class="airport-time">${checkInShort || ""}</div>
-            <div class="airport-name">Check-in</div>
           </div>
 
           <div class="flight-arrow">
@@ -726,7 +725,6 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           <div class="airport-info">
             <div class="airport-code">CHECK-OUT</div>
             <div class="airport-time">${checkOutShort || ""}</div>
-            <div class="airport-name">Check-out</div>
           </div>
         </div>
 
