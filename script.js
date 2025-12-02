@@ -176,8 +176,7 @@ function renderHotelSelect(trips) {
   select.value = "__new__";
 }
 
-// Date & time helpers
-
+// Adjust ISO string date to a new YYYY-MM-DD, keeping time & timezone
 function adjustIsoDateKeepingTime(isoString, newDateStr) {
   if (!isoString || !newDateStr) return isoString;
   const match = isoString.match(/T(.+)/);
@@ -210,16 +209,6 @@ function formatFriendlyDate(dateStr) {
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
-}
-
-function formatShortDate(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr + "T00:00:00");
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric"
   });
@@ -374,219 +363,191 @@ function renderTripSelect(trips, activeTripId) {
   }
 }
 
-// Build combined events timeline (flights + hotels) for a trip
-function buildTripEvents(trip) {
-  if (!trip) return [];
-
-  const events = [];
-
-  // Flights
-  if (Array.isArray(trip.records)) {
-    for (const rec of trip.records) {
-      const depIso =
-        rec.route &&
-        rec.route.departure &&
-        rec.route.departure.scheduled;
-      let sortKey;
-      if (depIso) {
-        sortKey = depIso;
-      } else if (rec.flightDate) {
-        sortKey = rec.flightDate + "T00:00:00";
-      } else {
-        sortKey = rec.createdAt || "";
-      }
-      events.push({
-        type: "flight",
-        sortKey,
-        record: rec
-      });
-    }
-  }
-
-  // Hotels
-  if (Array.isArray(trip.hotels)) {
-    for (const h of trip.hotels) {
-      const sortKey = h.checkInDate
-        ? h.checkInDate + "T00:00:00"
-        : h.createdAt || "";
-      events.push({
-        type: "hotel",
-        sortKey,
-        hotel: h
-      });
-    }
-  }
-
-  events.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  return events;
-}
-
-// Render combined events (flights + hotels) into the same tile list
-function renderTripEvents(trip, containerEl, summaryEl) {
+function renderTripFlights(trip, containerEl, summaryEl) {
   containerEl.innerHTML = "";
 
   if (!trip) {
     const empty = document.createElement("div");
     empty.className = "tiles-empty";
     empty.textContent =
-      "Select an existing trip or enter a new trip name to see events here.";
+      "Select an existing trip or enter a new trip name to see flights here.";
     containerEl.appendChild(empty);
     if (summaryEl) summaryEl.textContent = "No trip selected";
     return;
   }
 
-  const events = buildTripEvents(trip);
+  const records = Array.isArray(trip.records)
+    ? trip.records.slice().sort((a, b) => {
+        if (!a.flightDate || !b.flightDate) return 0;
+        return a.flightDate.localeCompare(b.flightDate);
+      })
+    : [];
 
   if (summaryEl) {
-    const count = events.length;
+    const count = records.length;
     summaryEl.textContent =
       count === 0
-        ? `${trip.name} • no events yet`
-        : `${trip.name} • ${count} event${count > 1 ? "s" : ""}`;
+        ? `${trip.name} • no flights yet`
+        : `${trip.name} • ${count} flight${count > 1 ? "s" : ""}`;
   }
 
-  if (events.length === 0) {
+  if (records.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tiles-empty";
-    empty.textContent = "No events in this trip yet. Use “Add flight” or “Add hotel”.";
+    empty.textContent = "No flights in this trip yet. Use “Add flight” to create one.";
     containerEl.appendChild(empty);
     return;
   }
 
-  for (const evt of events) {
-    if (evt.type === "flight") {
-      const rec = evt.record;
-      const tile = document.createElement("div");
-      tile.className = "flight-tile";
+  for (const rec of records) {
+    const tile = document.createElement("div");
+    tile.className = "flight-tile";
 
-      const route = rec.route || {};
-      const dep = route.departure || {};
-      const arr = route.arrival || {};
+    const route = rec.route || {};
+    const dep = route.departure || {};
+    const arr = route.arrival || {};
 
-      const dateLabel = formatFriendlyDate(rec.flightDate);
-      const airlineLabel = `${route.airline || ""} ${route.flightNumber || ""}`.trim();
+    const dateLabel = formatFriendlyDate(rec.flightDate);
+    const airlineLabel = `${route.airline || ""} ${route.flightNumber || ""}`.trim();
 
-      const depTime = extractTime(dep.scheduled);
-      const arrTime = extractTime(arr.scheduled);
-      const durationMin = computeDurationMinutes(dep.scheduled, arr.scheduled);
-      const durationLabel = formatDuration(durationMin);
+    const depTime = extractTime(dep.scheduled);
+    const arrTime = extractTime(arr.scheduled);
+    const durationMin = computeDurationMinutes(dep.scheduled, arr.scheduled);
+    const durationLabel = formatDuration(durationMin);
 
-      const depCode = dep.iata || dep.icao || "";
-      const arrCode = arr.iata || arr.icao || "";
-      const depName = dep.airport || "";
-      const arrName = arr.airport || "";
+    const depCode = dep.iata || dep.icao || "";
+    const arrCode = arr.iata || arr.icao || "";
+    const depName = dep.airport || "";
+    const arrName = arr.airport || "";
 
-      const pnrDisplay = rec.pnr || "—";
-      const paxList = Array.isArray(rec.paxNames) ? rec.paxNames : [];
+    const pnrDisplay = rec.pnr || "—";
+    const paxList = Array.isArray(rec.paxNames) ? rec.paxNames : [];
 
-      tile.innerHTML = `
-        <div class="flight-tile-header">
-          <span class="flight-date">${dateLabel}</span>
-          <span class="flight-airline">${airlineLabel || "Flight"}</span>
+    tile.innerHTML = `
+      <div class="flight-tile-header">
+        <span class="flight-date">${dateLabel}</span>
+        <span class="flight-airline">${airlineLabel || "Unknown flight"}</span>
+      </div>
+
+      <div class="flight-route">
+        <div class="airport-info">
+          <div class="airport-code">${depCode || "—"}</div>
+          <div class="airport-time">${depTime || ""}</div>
+          <div class="airport-name">${depName || ""}</div>
         </div>
 
-        <div class="flight-route">
-          <div class="airport-info">
-            <div class="airport-code">${depCode || "—"}</div>
-            <div class="airport-time">${depTime || ""}</div>
-            <div class="airport-name">${depName || ""}</div>
-          </div>
-
-          <div class="flight-arrow">
-            →
-            <div class="flight-duration">${durationLabel || ""}</div>
-          </div>
-
-          <div class="airport-info">
-            <div class="airport-code">${arrCode || "—"}</div>
-            <div class="airport-time">${arrTime || ""}</div>
-            <div class="airport-name">${arrName || ""}</div>
-          </div>
+        <div class="flight-arrow">
+          →
+          <div class="flight-duration">${durationLabel || ""}</div>
         </div>
 
-        <div class="flight-footer">
-          <div class="flight-detail">
-            <span class="flight-detail-label">Booking Ref</span>
-            <span class="flight-detail-value">${pnrDisplay}</span>
-          </div>
-          <div class="passenger-names">
-            <span class="flight-detail-label">Passengers</span>
-            <div class="passenger-list">
-              ${
-                paxList.length
-                  ? paxList
-                      .map((name) => `<span class="passenger-name">${name}</span>`)
-                      .join("")
-                  : '<span class="passenger-name">None saved</span>'
-              }
-            </div>
+        <div class="airport-info">
+          <div class="airport-code">${arrCode || "—"}</div>
+          <div class="airport-time">${arrTime || ""}</div>
+          <div class="airport-name">${arrName || ""}</div>
+        </div>
+      </div>
+
+      <div class="flight-footer">
+        <div class="flight-detail">
+          <span class="flight-detail-label">Booking Ref</span>
+          <span class="flight-detail-value">${pnrDisplay}</span>
+        </div>
+        <div class="passenger-names">
+          <span class="flight-detail-label">Passengers</span>
+          <div class="passenger-list">
+            ${
+              paxList.length
+                ? paxList
+                    .map((name) => `<span class="passenger-name">${name}</span>`)
+                    .join("")
+                : '<span class="passenger-name">None saved</span>'
+            }
           </div>
         </div>
-      `;
+      </div>
+    `;
 
-      containerEl.appendChild(tile);
-    } else if (evt.type === "hotel") {
-      const h = evt.hotel;
-      const tile = document.createElement("div");
-      tile.className = "flight-tile"; // reuse same tile style
+    containerEl.appendChild(tile);
+  }
+}
 
-      const checkInLabel = formatFriendlyDate(h.checkInDate);
-      const checkOutLabel = formatFriendlyDate(h.checkOutDate);
-      const checkInShort = formatShortDate(h.checkInDate);
-      const checkOutShort = formatShortDate(h.checkOutDate);
-      const nights = computeNights(h.checkInDate, h.checkOutDate);
-      const nightsLabel =
-        nights != null ? `${nights} night${nights === 1 ? "" : "s"}` : "";
-      const pax = h.paxCount || 1;
-      const bookingId = h.id || "—";
-      const paymentType = h.paymentType || "prepaid";
-      const paymentText =
-        paymentType === "prepaid" ? "Already paid" : "Pay at hotel";
+function renderTripHotels(trip, containerEl, summaryEl) {
+  containerEl.innerHTML = "";
 
-      tile.innerHTML = `
-        <div class="flight-tile-header">
-          <span class="flight-date">${checkInLabel}</span>
-          <span class="flight-airline">Hotel • ${h.hotelName || "Unnamed"}</span>
+  if (!trip) {
+    const empty = document.createElement("div");
+    empty.className = "tiles-empty";
+    empty.textContent = "Select a trip to see its hotels.";
+    containerEl.appendChild(empty);
+    if (summaryEl) summaryEl.textContent = "No trip selected";
+    return;
+  }
+
+  const hotels = Array.isArray(trip.hotels)
+    ? trip.hotels.slice().sort((a, b) => {
+        if (!a.checkInDate || !b.checkInDate) return 0;
+        return a.checkInDate.localeCompare(b.checkInDate);
+      })
+    : [];
+
+  if (summaryEl) {
+    const count = hotels.length;
+    summaryEl.textContent =
+      count === 0
+        ? `${trip.name} • no hotels yet`
+        : `${trip.name} • ${count} hotel${count > 1 ? "s" : ""}`;
+  }
+
+  if (hotels.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tiles-empty";
+    empty.textContent = "No hotels in this trip yet. Use “Add hotel” to create one.";
+    containerEl.appendChild(empty);
+    return;
+  }
+
+  for (const h of hotels) {
+    const tile = document.createElement("div");
+    tile.className = "hotel-tile";
+
+    const checkInLabel = formatFriendlyDate(h.checkInDate);
+    const checkOutLabel = formatFriendlyDate(h.checkOutDate);
+    const nights = computeNights(h.checkInDate, h.checkOutDate);
+    const pax = h.paxCount || 1;
+    const payment = h.paymentType || "prepaid";
+    const bookingId = h.id || "—";
+
+    const paymentBadgeClass =
+      payment === "prepaid" ? "hotel-badge-paid" : "hotel-badge-pay-hotel";
+    const paymentText =
+      payment === "prepaid" ? "Already paid" : "Pay at hotel";
+
+    tile.innerHTML = `
+      <div class="hotel-tile-header">
+        <div class="hotel-name">${h.hotelName || "Unnamed hotel"}</div>
+        <div class="hotel-dates">
+          ${checkInLabel || "?"} – ${checkOutLabel || "?"}
         </div>
+      </div>
 
-        <div class="flight-route">
-          <div class="airport-info">
-            <div class="airport-code">IN</div>
-            <div class="airport-time">${checkInShort || ""}</div>
-            <div class="airport-name">Check-in</div>
-          </div>
-
-          <div class="flight-arrow">
-            →
-            <div class="flight-duration">${nightsLabel}</div>
-          </div>
-
-          <div class="airport-info">
-            <div class="airport-code">OUT</div>
-            <div class="airport-time">${checkOutShort || ""}</div>
-            <div class="airport-name">Check-out</div>
-          </div>
+      <div class="hotel-main">
+        <div class="hotel-main-left">
+          <div>${nights != null ? `${nights} night${nights === 1 ? "" : "s"}` : ""}</div>
+          <div>${pax} guest${pax === 1 ? "" : "s"}</div>
         </div>
-
-        <div class="flight-footer">
-          <div class="flight-detail">
-            <span class="flight-detail-label">Booking Ref</span>
-            <span class="flight-detail-value">${bookingId}</span>
-          </div>
-          <div class="passenger-names">
-            <span class="flight-detail-label">Guests</span>
-            <div class="passenger-list">
-              <span class="passenger-name">
-                ${pax} guest${pax === 1 ? "" : "s"}
-              </span>
-              <span class="passenger-name">${paymentText}</span>
-            </div>
-          </div>
+        <div class="hotel-main-right">
+          <span class="${paymentBadgeClass}">${paymentText}</span>
         </div>
-      `;
+      </div>
 
-      containerEl.appendChild(tile);
-    }
+      <div class="hotel-footer">
+        <span>Booking ID: <strong>${bookingId}</strong></span>
+        <span>Trip: ${trip.name}</span>
+      </div>
+    `;
+
+    containerEl.appendChild(tile);
   }
 }
 
@@ -600,9 +561,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const tripNewInput = document.getElementById("trip-new-name");
   const tripErrorEl = document.getElementById("trip-error");
 
-  // We reuse the flights list container for ALL events
-  const tripEventsList = document.getElementById("trip-flights-list");
-  const tripEventsSummary = document.getElementById("trip-flights-summary");
+  const tripFlightsList = document.getElementById("trip-flights-list");
+  const tripFlightsSummary = document.getElementById("trip-flights-summary");
+
+  const tripHotelsList = document.getElementById("trip-hotels-list");
+  const tripHotelsSummary = document.getElementById("trip-hotels-summary");
 
   const addFlightBtn = document.getElementById("add-flight-btn");
   const flightOverlay = document.getElementById("flight-overlay");
@@ -660,7 +623,8 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPassengerSelect(trips);
   renderHotelSelect(trips);
   const initialTrip = trips.find((t) => String(t.id) === String(activeTripId)) || null;
-  renderTripEvents(initialTrip, tripEventsList, tripEventsSummary);
+  renderTripFlights(initialTrip, tripFlightsList, tripFlightsSummary);
+  renderTripHotels(initialTrip, tripHotelsList, tripHotelsSummary);
 
   updateApiKeyStatus("Loading API key from config.json…");
   loadApiKeyFromConfigJson();
@@ -844,10 +808,12 @@ document.addEventListener("DOMContentLoaded", () => {
       activeTripId = val;
       tripNewInput.value = "";
       const trip = trips.find((t) => String(t.id) === String(activeTripId)) || null;
-      renderTripEvents(trip, tripEventsList, tripEventsSummary);
+      renderTripFlights(trip, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(trip, tripHotelsList, tripHotelsSummary);
     } else {
       activeTripId = null;
-      renderTripEvents(null, tripEventsList, tripEventsSummary);
+      renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     }
     updateAddFlightState();
     updateAddHotelState();
@@ -859,7 +825,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (tripSelect.value !== "__new__") {
       tripSelect.value = "__new__";
       activeTripId = null;
-      renderTripEvents(null, tripEventsList, tripEventsSummary);
+      renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+      renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     }
     updateAddFlightState();
     updateAddHotelState();
@@ -1002,7 +969,8 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTripsJson(trips);
     renderPassengerSelect(trips);
     renderHotelSelect(trips);
-    renderTripEvents(currentTrip, tripEventsList, tripEventsSummary);
+    renderTripFlights(currentTrip, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(currentTrip, tripHotelsList, tripHotelsSummary);
 
     // Clear flight fields
     inputFlight.value = "";
@@ -1124,7 +1092,8 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTripsJson(trips);
     renderPassengerSelect(trips);
     renderHotelSelect(trips);
-    renderTripEvents(currentTrip, tripEventsList, tripEventsSummary);
+    renderTripFlights(currentTrip, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(currentTrip, tripHotelsList, tripHotelsSummary);
 
     closeHotelOverlay();
 
@@ -1180,7 +1149,8 @@ document.addEventListener("DOMContentLoaded", () => {
         renderHotelSelect(trips);
         const trip =
           trips.find((t) => String(t.id) === String(activeTripId)) || null;
-        renderTripEvents(trip, tripEventsList, tripEventsSummary);
+        renderTripFlights(trip, tripFlightsList, tripFlightsSummary);
+        renderTripHotels(trip, tripHotelsList, tripHotelsSummary);
         updateAddFlightState();
         updateAddHotelState();
         alert("Trips imported successfully.");
@@ -1203,7 +1173,8 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTripSelect(trips, activeTripId);
     renderPassengerSelect(trips);
     renderHotelSelect(trips);
-    renderTripEvents(null, tripEventsList, tripEventsSummary);
+    renderTripFlights(null, tripFlightsList, tripFlightsSummary);
+    renderTripHotels(null, tripHotelsList, tripHotelsSummary);
     updateAddFlightState();
     updateAddHotelState();
   });
