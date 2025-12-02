@@ -23,12 +23,34 @@
         <span id="api-key-status" class="api-status-text">
           Checking API key…
         </span>
+        <div class="topbar-actions">
+          <button id="import-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">⬆︎</span>
+            <span>Import</span>
+          </button>
+          <button id="download-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">⬇︎</span>
+            <span>Download</span>
+          </button>
+          <button id="clear-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">🗑</span>
+            <span>Clear</span>
+          </button>
+        </div>
+
+        <!-- Hidden file input for import -->
+        <input
+          id="import-json-file"
+          type="file"
+          accept="application/json"
+          style="display:none;"
+        />
       </div>
     </header>
 
-    <!-- Main layout -->
+    <!-- Main layout: single column -->
     <main class="layout-columns">
-      <!-- LEFT: Trips + tiles -->
+      <!-- Trips + tiles (full width) -->
       <section class="panel panel-left">
         <div class="panel-header">
           <div>
@@ -75,17 +97,20 @@
           <!-- Flights in selected trip (tiles) -->
           <div class="card card-tiles">
             <div class="card-header tiles-header-row">
-              <div>
+              <div class="tiles-header-left">
                 <div class="card-title">Flights in this trip</div>
                 <div class="card-subtitle">
                   Saved flights appear as tiles below.
                 </div>
               </div>
 
-              <div class="tiles-header-actions">
+              <div class="tiles-header-center">
                 <span id="trip-flights-summary" class="chip chip-soft">
                   No trip selected
                 </span>
+              </div>
+
+              <div class="tiles-header-right">
                 <button id="add-flight-btn" class="btn btn-primary btn-small" disabled>
                   <span class="btn-icon">＋</span>
                   <span>Add flight</span>
@@ -100,48 +125,6 @@
             </div>
           </div>
         </div>
-      </section>
-
-      <!-- RIGHT: Data / backup -->
-      <section class="panel panel-right">
-        <section class="card card-data">
-          <div class="card-header">
-            <div class="card-title">Data &amp; backup</div>
-            <div class="card-subtitle">
-              Your trips are stored locally in this browser. Export or import them as JSON.
-            </div>
-          </div>
-
-          <div class="button-row">
-            <button id="import-json" class="btn btn-ghost">
-              <span class="btn-icon">⬆︎</span>
-              <span>Import JSON</span>
-            </button>
-            <button id="download-json" class="btn btn-ghost">
-              <span class="btn-icon">⬇︎</span>
-              <span>Download JSON</span>
-            </button>
-            <button id="clear-json" class="btn btn-ghost">
-              <span class="btn-icon">🗑</span>
-              <span>Clear All</span>
-            </button>
-          </div>
-
-          <!-- Hidden file input for import -->
-          <input
-            id="import-json-file"
-            type="file"
-            accept="application/json"
-            style="display:none;"
-          />
-
-          <div class="secondary-card secondary-card-json">
-            <div class="json-label-row">
-              <div class="json-title">All trips (raw JSON)</div>
-            </div>
-            <pre id="saved-json" class="json-block">[]</pre>
-          </div>
-        </section>
       </section>
     </main>
   </div>
