@@ -375,6 +375,8 @@ function renderTripSelect(trips, activeTripId) {
 }
 
 // Build combined events timeline (flights grouped by PNR+date + hotels)
+// Build combined events timeline (flights grouped by PNR+date + hotels)
+// Flights come before hotels when they fall on the same calendar day.
 function buildTripEvents(trip) {
   if (!trip) return [];
 
@@ -385,21 +387,26 @@ function buildTripEvents(trip) {
 
   if (Array.isArray(trip.records)) {
     for (const rec of trip.records) {
+      if (!rec) continue;
+
       const route = rec.route || {};
       const dep = route.departure || {};
       const depIso = dep.scheduled;
 
-      const baseSort = depIso
-        ? depIso
-        : rec.flightDate
-        ? rec.flightDate + "T00:00:00"
-        : rec.createdAt || "";
+      let baseSort;
+      if (depIso) {
+        baseSort = depIso; // precise time if we have it
+      } else if (rec.flightDate) {
+        baseSort = rec.flightDate + "T00:00:00";
+      } else {
+        baseSort = rec.createdAt || "";
+      }
 
       // Only group when we have both a PNR and a date
       const hasPnrAndDate = rec.pnr && rec.flightDate;
       const key = hasPnrAndDate
         ? `PNR__${rec.flightDate}__${rec.pnr}`
-        : `FLIGHT__${rec.id}`; // unique -> stays single-tile
+        : `FLIGHT__${rec.id}`;
 
       let group = groups.get(key);
       if (!group) {
@@ -412,9 +419,11 @@ function buildTripEvents(trip) {
         };
         groups.set(key, group);
       }
+
       group.records.push(rec);
 
-      if (!group.sortKey || baseSort < group.sortKey) {
+      // Keep earliest departure as group sort key
+      if (!group.sortKey || (baseSort && baseSort < group.sortKey)) {
         group.sortKey = baseSort;
       }
     }
@@ -424,48 +433,59 @@ function buildTripEvents(trip) {
     events.push(group);
   }
 
-  // Hotels
+  // --- Hotels ---
   if (Array.isArray(trip.hotels)) {
     for (const h of trip.hotels) {
-      const sortKey = h.checkInDate
-        ? h.checkInDate + "T00:00:00"
-        : h.createdAt || "";
+      if (!h || typeof h !== "object") continue;
+
+      // Prefer check-in date; fall back to createdAt’s date if needed
+      let datePart = "";
+      if (h.checkInDate) {
+        datePart = h.checkInDate;
+      } else if (h.createdAt) {
+        datePart = String(h.createdAt).slice(0, 10); // YYYY-MM-DD
+      }
+
+      const sortKey = datePart
+        ? `${datePart}T00:00:00`
+        : (h.createdAt || "");
+
       events.push({
         type: "hotel",
-        sortKey,
-        hotel: h
+        hotel: h,
+        sortKey
       });
     }
   }
 
-  // --- NEW SORTING LOGIC ---
-  // 1) Sort by calendar date (YYYY-MM-DD)
-  // 2) For same date, flights (flightGroup) before hotels
-  // 3) Then by full sortKey (time)
-  events.sort((a, b) => {
-    const sa = a.sortKey || "";
-    const sb = b.sortKey || "";
+  // --- Sort: by calendar day, then type (flights before hotels), then sortKey ---
+  for (const evt of events) {
+    const s = evt.sortKey || "";
+    evt._dateKey = s ? s.slice(0, 10) : "";           // YYYY-MM-DD
+    evt._kindPriority = evt.type === "hotel" ? 1 : 0; // 0 = flight, 1 = hotel
+  }
 
-    const da = sa.slice(0, 10);
-    const db = sb.slice(0, 10);
+  events.sort((a, b) => {
+    const da = a._dateKey;
+    const db = b._dateKey;
 
     if (da && db && da !== db) {
-      return da.localeCompare(db);
+      return da.localeCompare(db); // earlier day first
     }
 
-    const typeRank = { flightGroup: 0, flight: 0, hotel: 1 };
-    const ra = typeRank[a.type] ?? 99;
-    const rb = typeRank[b.type] ?? 99;
-
-    if (ra !== rb) {
-      return ra - rb; // flights first, then hotels
+    if (a._kindPriority !== b._kindPriority) {
+      // same day → flights first, then hotels
+      return a._kindPriority - b._kindPriority;
     }
 
+    const sa = a.sortKey || "";
+    const sb = b.sortKey || "";
     return sa.localeCompare(sb);
   });
 
   return events;
 }
+
 
 // Render combined events (flight groups + hotels) into the same tile list
 function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
