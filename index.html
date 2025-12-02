@@ -15,7 +15,7 @@
         <div class="topbar-text">
           <div class="topbar-title">Flight Log</div>
           <div class="topbar-subtitle">
-            Personal travel diary – trips, flights, passengers &amp; PNRs.
+            Personal travel diary – trips, flights, hotels &amp; PNRs.
           </div>
         </div>
       </div>
@@ -55,7 +55,9 @@
         <div class="panel-header">
           <div>
             <div class="panel-title">Trips</div>
-            <div class="panel-subtitle">Select a trip and see the flights inside.</div>
+            <div class="panel-subtitle">
+              Select a trip and see its flights and hotels.
+            </div>
           </div>
         </div>
 
@@ -67,6 +69,7 @@
                 <div class="card-title">Trip selection</div>
                 <div class="card-subtitle">Step 1 – choose or create a trip</div>
               </div>
+              <span class="chip">Step 1</span>
             </div>
 
             <div class="field-group">
@@ -74,7 +77,7 @@
                 <label for="trip-existing">Existing Trip</label>
                 <select id="trip-existing"></select>
                 <small>
-                  Choose a trip to add flights to it, or leave on “New trip” and name one below.
+                  Choose a trip to add flights/hotels to it, or leave on “New trip” and name one below.
                 </small>
               </div>
 
@@ -86,7 +89,7 @@
                   placeholder="Summer 2026 – Greece"
                   autocomplete="off"
                 />
-                <small>If filled, a new trip will be created when you save a flight.</small>
+                <small>If filled, a new trip will be created when you save a flight or hotel.</small>
               </div>
             </div>
 
@@ -120,6 +123,37 @@
             <div id="trip-flights-list" class="tiles-grid">
               <div class="tiles-empty">
                 Select an existing trip or enter a new trip name to see flights here.
+              </div>
+            </div>
+          </div>
+
+          <!-- Hotels in selected trip (tiles) -->
+          <div class="card card-hotels">
+            <div class="card-header hotels-header-row">
+              <div class="hotels-header-left">
+                <div class="card-title">Hotels in this trip</div>
+                <div class="card-subtitle">
+                  Track stays and booking confirmations.
+                </div>
+              </div>
+
+              <div class="hotels-header-center">
+                <span id="trip-hotels-summary" class="chip chip-soft">
+                  No trip selected
+                </span>
+              </div>
+
+              <div class="hotels-header-right">
+                <button id="add-hotel-btn" class="btn btn-primary btn-small" disabled>
+                  <span class="btn-icon">＋</span>
+                  <span>Add hotel</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="trip-hotels-list" class="tiles-grid">
+              <div class="tiles-empty">
+                Select a trip to see its hotel bookings.
               </div>
             </div>
           </div>
@@ -236,6 +270,104 @@
         </div>
         <pre id="output" class="json-block">{}</pre>
       </div>
+    </section>
+  </div>
+
+  <!-- Hotel overlay (New hotel form) -->
+  <div id="hotel-overlay" class="overlay hidden" aria-hidden="true">
+    <div class="overlay-backdrop"></div>
+
+    <section class="card card-hotel overlay-card" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        id="close-hotel-overlay"
+        class="overlay-close-btn"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <div class="card-header">
+        <div>
+          <div class="card-title">New hotel booking</div>
+          <div class="card-subtitle">
+            Add a stay to the selected trip.
+          </div>
+        </div>
+      </div>
+
+      <form id="hotel-form">
+        <div class="field-group">
+          <div class="field">
+            <label for="hotel-name">Hotel name</label>
+            <input
+              id="hotel-name"
+              type="text"
+              placeholder="Four Seasons Athens"
+              autocomplete="off"
+              required
+            />
+            <div id="hotel-name-error" class="field-error" aria-live="polite"></div>
+          </div>
+
+          <div class="field">
+            <label for="hotel-pax">Number of guests</label>
+            <input
+              id="hotel-pax"
+              type="number"
+              min="1"
+              max="20"
+              step="1"
+              placeholder="2"
+            />
+            <div id="hotel-pax-error" class="field-error" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field">
+            <label for="hotel-checkin">Check-in</label>
+            <input id="hotel-checkin" type="date" />
+          </div>
+          <div class="field">
+            <label for="hotel-checkout">Check-out</label>
+            <input id="hotel-checkout" type="date" />
+          </div>
+        </div>
+        <div id="hotel-dates-error" class="field-error" aria-live="polite"></div>
+
+        <div class="field-group">
+          <div class="field">
+            <label for="hotel-payment">Payment</label>
+            <select id="hotel-payment">
+              <option value="prepaid">Already paid</option>
+              <option value="pay_at_hotel">Pay at hotel</option>
+            </select>
+            <small>Whether the room is already paid or due at the property.</small>
+          </div>
+
+          <div class="field">
+            <label for="hotel-id">Booking / confirmation ID</label>
+            <input
+              id="hotel-id"
+              type="text"
+              placeholder="ABC123 or leave empty"
+              autocomplete="off"
+            />
+            <small>If left empty, an ID will be generated.</small>
+          </div>
+        </div>
+
+        <div class="button-row overlay-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-hotel-btn">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" disabled>
+            <span class="btn-icon">➕</span>
+            <span>Save hotel</span>
+          </button>
+        </div>
+      </form>
     </section>
   </div>
 
