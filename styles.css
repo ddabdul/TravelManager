@@ -38,8 +38,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Helper */
-
+/* Generic hide helper */
 .hidden {
   display: none !important;
 }
@@ -174,11 +173,6 @@ body {
   margin-bottom: 14px;
 }
 
-.card-heading {
-  display: flex;
-  flex-direction: column;
-}
-
 .card-title {
   font-size: 16px;
   font-weight: 600;
@@ -212,15 +206,6 @@ body {
 .chip-soft {
   background: rgba(142,142,147,0.12);
   color: var(--text-secondary);
-}
-
-.badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid rgba(0,122,255,0.35);
 }
 
 /* Forms & fields */
@@ -331,6 +316,12 @@ small {
   transition: transform 0.08s ease, box-shadow 0.12s ease,
     background-color 0.12s ease, border-color 0.12s ease;
   -webkit-appearance: none;
+}
+
+.btn-small {
+  padding: 5px 12px;
+  font-size: 13px;
+  box-shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -454,6 +445,17 @@ small {
   }
 }
 
+/* Badges */
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(0,122,255,0.35);
+}
+
 /* API status */
 
 .api-status-text {
@@ -485,35 +487,38 @@ small {
   align-items: center;
 }
 
+.tiles-header-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
 .tiles-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-.tiles-add-row {
-  margin-top: 10px;
-}
-
-/* Perplexity-style flight tile */
+/* More compact Flight Tile */
 
 .flight-tile {
-  max-width: 520px;
+  max-width: 440px;
   width: 100%;
   margin: 0 auto;
   background: #ffffff;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: all 0.25s ease;
   cursor: default;
 }
 
 .flight-tile:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
   border-color: #0066cc;
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 /* Header: date + airline pill */
@@ -522,22 +527,22 @@ small {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #e0e0e0;
 }
 
 .flight-date {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #0066cc;
 }
 
 .flight-airline {
-  font-size: 12px;
+  font-size: 11px;
   color: #666666;
   background: #f0f4ff;
-  padding: 4px 8px;
+  padding: 3px 7px;
   border-radius: 4px;
   white-space: nowrap;
 }
@@ -547,8 +552,8 @@ small {
 .flight-route {
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 16px;
+  gap: 16px;
+  margin-bottom: 10px;
 }
 
 .airport-info {
@@ -557,21 +562,21 @@ small {
 }
 
 .airport-code {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: #1a1a1a;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .airport-time {
-  font-size: 13px;
+  font-size: 12px;
   color: #1a1a1a;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .airport-name {
-  font-size: 11px;
+  font-size: 10px;
   color: #666666;
   line-height: 1.4;
 }
@@ -579,16 +584,17 @@ small {
 /* Arrow + duration */
 
 .flight-arrow {
-  flex: 0 0 40px;
+  flex: 0 0 34px;
   text-align: center;
   color: #666666;
   font-weight: 300;
+  font-size: 16px;
 }
 
 .flight-duration {
-  font-size: 11px;
+  font-size: 10px;
   color: #666666;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 /* Footer: booking ref + passengers */
@@ -597,10 +603,10 @@ small {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid #e0e0e0;
-  font-size: 12px;
-  gap: 12px;
+  font-size: 11px;
+  gap: 8px;
 }
 
 .flight-detail {
@@ -610,14 +616,14 @@ small {
 }
 
 .flight-detail-label {
-  font-size: 10px;
+  font-size: 9px;
   color: #666666;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .flight-detail-value {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #1a1a1a;
 }
@@ -634,10 +640,10 @@ small {
 }
 
 .passenger-name {
-  font-size: 11px;
+  font-size: 10px;
   color: #666666;
   background: #f0f4ff;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
 }
@@ -648,4 +654,55 @@ small {
   font-size: 12px;
   color: var(--text-secondary);
   padding: 10px 4px;
+}
+
+/* =========================
+   Overlay for New Flight
+   ========================= */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+}
+
+.overlay-card {
+  position: relative;
+  max-width: 540px;
+  width: 100%;
+  margin: 0 16px;
+  z-index: 1001;
+}
+
+.overlay-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  background: rgba(142,142,147,0.16);
+  color: var(--text-secondary);
+}
+
+.overlay-close-btn:hover {
+  background: rgba(142,142,147,0.25);
+}
+
+.overlay-actions {
+  justify-content: flex-end;
 }
