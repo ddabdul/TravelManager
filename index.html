@@ -41,11 +41,9 @@
           <!-- Trip selection / creation -->
           <div class="card card-trip">
             <div class="card-header">
-              <div class="card-heading">
+              <div>
                 <div class="card-title">Trip selection</div>
-                <div class="card-subtitle">
-                  Step 1 – choose an existing trip or create a new one.
-                </div>
+                <div class="card-subtitle">Step 1 – choose or create a trip</div>
               </div>
               <span class="chip">Step 1</span>
             </div>
@@ -83,9 +81,16 @@
                   Saved flights appear as tiles below.
                 </div>
               </div>
-              <span id="trip-flights-summary" class="chip chip-soft">
-                No trip selected
-              </span>
+
+              <div class="tiles-header-actions">
+                <span id="trip-flights-summary" class="chip chip-soft">
+                  No trip selected
+                </span>
+                <button id="add-flight-btn" class="btn btn-primary btn-small" disabled>
+                  <span class="btn-icon">＋</span>
+                  <span>Add flight</span>
+                </button>
+              </div>
             </div>
 
             <div id="trip-flights-list" class="tiles-grid">
@@ -93,124 +98,17 @@
                 Select an existing trip or enter a new trip name to see flights here.
               </div>
             </div>
-
-            <!-- Add flight button under tiles -->
-            <div class="button-row tiles-add-row">
-              <button id="add-flight-btn" class="btn btn-primary" disabled>
-                <span class="btn-icon">＋</span>
-                <span>Add flight</span>
-              </button>
-            </div>
           </div>
         </div>
       </section>
 
-      <!-- RIGHT: Flight form + data / backup -->
+      <!-- RIGHT: Data / backup -->
       <section class="panel panel-right">
-        <!-- New flight card – hidden until "Add flight" -->
-        <section class="card card-flight hidden">
-          <div class="card-header">
-            <div class="card-heading">
-              <div class="card-title">New flight</div>
-              <div class="card-subtitle">
-                Step 2 – add a flight to the selected trip.
-              </div>
-            </div>
-            <span class="chip">Step 2</span>
-          </div>
-
-          <form id="flight-form">
-            <!-- Flight info -->
-            <div class="field-group">
-              <div class="field">
-                <label for="flight-number">Flight Number</label>
-                <input
-                  id="flight-number"
-                  type="text"
-                  placeholder="LH438 or BA 2785"
-                  autocomplete="off"
-                  required
-                />
-                <small>2 airline letters + 1–4 digits, e.g. BA2785.</small>
-                <div id="flight-error" class="field-error" aria-live="polite"></div>
-              </div>
-
-              <div class="field">
-                <label for="flight-date">Flight Date</label>
-                <input
-                  id="flight-date"
-                  type="date"
-                  required
-                />
-                <small>Used to align the route’s scheduled date.</small>
-                <div id="flight-date-error" class="field-error" aria-live="polite"></div>
-              </div>
-            </div>
-
-            <!-- Passengers -->
-            <div class="field-group">
-              <div class="field">
-                <label for="pax-existing">Passenger(s)</label>
-                <select id="pax-existing" multiple></select>
-                <small>Use ⌘ / Ctrl / Shift to select multiple, or leave empty.</small>
-              </div>
-
-              <div class="field">
-                <label for="pax-new">Add New Passenger</label>
-                <input
-                  id="pax-new"
-                  type="text"
-                  placeholder="John Doe, Jane Doe"
-                  autocomplete="off"
-                />
-                <small>Comma-separated. New names become selectable next time.</small>
-              </div>
-            </div>
-
-            <div id="pax-error" class="field-error" aria-live="polite"></div>
-
-            <!-- PNR -->
-            <div class="field-group">
-              <div class="field">
-                <label for="pnr">PNR Code</label>
-                <input
-                  id="pnr"
-                  type="text"
-                  maxlength="6"
-                  placeholder="ABC123"
-                  autocomplete="off"
-                />
-                <small>Optional 6-character booking reference.</small>
-              </div>
-            </div>
-
-            <!-- Submit -->
-            <div class="button-row">
-              <button type="submit" class="btn btn-primary" disabled>
-                <span class="btn-icon">➕</span>
-                <span>Get Route &amp; Save</span>
-              </button>
-            </div>
-          </form>
-
-          <!-- Last fetched route -->
-          <div class="secondary-card">
-            <div class="json-label-row">
-              <div class="json-title">Last fetched route</div>
-              <span class="badge">Live preview</span>
-            </div>
-            <pre id="output" class="json-block">{}</pre>
-          </div>
-        </section>
-
-        <!-- Data / backup card -->
         <section class="card card-data">
           <div class="card-header">
-            <div class="card-heading">
-              <div class="card-title">Data &amp; backup</div>
-              <div class="card-subtitle">
-                Trips are stored locally in this browser. Export or import them as JSON.
-              </div>
+            <div class="card-title">Data &amp; backup</div>
+            <div class="card-subtitle">
+              Your trips are stored locally in this browser. Export or import them as JSON.
             </div>
           </div>
 
@@ -246,6 +144,117 @@
         </section>
       </section>
     </main>
+  </div>
+
+  <!-- Flight overlay (New flight form) -->
+  <div id="flight-overlay" class="overlay hidden" aria-hidden="true">
+    <div class="overlay-backdrop"></div>
+
+    <section class="card card-flight overlay-card" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        id="close-flight-overlay"
+        class="overlay-close-btn"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+      <div class="card-header">
+        <div>
+          <div class="card-title">New flight</div>
+          <div class="card-subtitle">
+            Step 2 – add a flight to the selected trip.
+          </div>
+        </div>
+      </div>
+
+      <form id="flight-form">
+        <!-- Flight info -->
+        <div class="field-group">
+          <div class="field">
+            <label for="flight-number">Flight Number</label>
+            <input
+              id="flight-number"
+              type="text"
+              placeholder="LH438 or BA 2785"
+              autocomplete="off"
+              required
+            />
+            <small>2 airline characters + 1–4 digits, e.g. BA2785.</small>
+            <div id="flight-error" class="field-error" aria-live="polite"></div>
+          </div>
+
+          <div class="field">
+            <label for="flight-date">Flight Date</label>
+            <input
+              id="flight-date"
+              type="date"
+              required
+            />
+            <small>Used to align the route’s scheduled date.</small>
+            <div id="flight-date-error" class="field-error" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <!-- Passengers -->
+        <div class="field-group">
+          <div class="field">
+            <label for="pax-existing">Passenger(s)</label>
+            <select id="pax-existing" multiple></select>
+            <small>Use ⌘ / Ctrl / Shift to select multiple, or leave empty.</small>
+          </div>
+
+          <div class="field">
+            <label for="pax-new">Add New Passenger</label>
+            <input
+              id="pax-new"
+              type="text"
+              placeholder="John Doe, Jane Doe"
+              autocomplete="off"
+            />
+            <small>Comma-separated. New names become selectable next time.</small>
+          </div>
+        </div>
+
+        <div id="pax-error" class="field-error" aria-live="polite"></div>
+
+        <!-- PNR -->
+        <div class="field-group">
+          <div class="field">
+            <label for="pnr">PNR Code</label>
+            <input
+              id="pnr"
+              type="text"
+              maxlength="6"
+              placeholder="ABC123"
+              autocomplete="off"
+            />
+            <small>Optional 6-character booking reference.</small>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="button-row overlay-actions">
+          <button type="button" class="btn btn-ghost" id="cancel-flight-btn">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" disabled>
+            <span class="btn-icon">➕</span>
+            <span>Get Route &amp; Save</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Last fetched route -->
+      <div class="secondary-card">
+        <div class="json-label-row">
+          <div class="json-title">Last fetched route</div>
+          <span class="badge">Live preview</span>
+        </div>
+        <pre id="output" class="json-block">{}</pre>
+      </div>
+    </section>
   </div>
 
   <script src="script.js"></script>
