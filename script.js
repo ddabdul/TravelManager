@@ -438,7 +438,32 @@ function buildTripEvents(trip) {
     }
   }
 
-  events.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  // --- NEW SORTING LOGIC ---
+  // 1) Sort by calendar date (YYYY-MM-DD)
+  // 2) For same date, flights (flightGroup) before hotels
+  // 3) Then by full sortKey (time)
+  events.sort((a, b) => {
+    const sa = a.sortKey || "";
+    const sb = b.sortKey || "";
+
+    const da = sa.slice(0, 10);
+    const db = sb.slice(0, 10);
+
+    if (da && db && da !== db) {
+      return da.localeCompare(db);
+    }
+
+    const typeRank = { flightGroup: 0, flight: 0, hotel: 1 };
+    const ra = typeRank[a.type] ?? 99;
+    const rb = typeRank[b.type] ?? 99;
+
+    if (ra !== rb) {
+      return ra - rb; // flights first, then hotels
+    }
+
+    return sa.localeCompare(sb);
+  });
+
   return events;
 }
 
