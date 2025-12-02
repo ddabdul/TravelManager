@@ -479,12 +479,14 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
   }
 
   for (const evt of events) {
-    // ---- FLIGHT GROUPS (may be 1 or multiple legs with same PNR+date) ----
+    // =========================
+    // FLIGHT GROUP (1+ legs, grouped by PNR+date)
+    // =========================
     if (evt.type === "flightGroup") {
       const legs = (evt.records || []).slice();
       if (legs.length === 0) continue;
 
-      // Sort legs by departure time if available
+      // Sort legs by departure time
       legs.sort((a, b) => {
         const ra = a.route || {};
         const rb = b.route || {};
@@ -494,85 +496,108 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       });
 
       const first = legs[0];
-      const last = legs[legs.length - 1];
-
-      const routeFirst = first.route || {};
-      const routeLast = last.route || {};
-      const depFirst = routeFirst.departure || {};
-      const arrLast = routeLast.arrival || {};
-
-      const groupDate =
-        first.flightDate || evt.flightDate || legs[0].flightDate || null;
+      const groupDate = first.flightDate || evt.flightDate || null;
       const dateLabel = formatFriendlyDate(groupDate);
 
       const pnrDisplay = evt.pnr || first.pnr || "—";
       const isMulti = legs.length > 1;
 
-      const firstDepIso = depFirst.scheduled;
-      const lastArrIso = arrLast.scheduled;
-      const groupDurationMinutes = computeDurationMinutes(firstDepIso, lastArrIso);
-      const durationLabel = formatDuration(groupDurationMinutes);
-
-      const depCode = depFirst.iata || depFirst.icao || "";
-      const arrCode = arrLast.iata || arrLast.icao || "";
-      const depTime = extractTime(firstDepIso);
-      const arrTime = extractTime(lastArrIso);
-      const depName = depFirst.airport || "";
-      const arrName = arrLast.airport || "";
-
-      // Airline / header label
-      let headerAirlineLabel;
-      if (!isMulti) {
-        const r = routeFirst;
-        headerAirlineLabel =
-          `${r.airline || ""} ${r.flightNumber || ""}`.trim() || "Flight";
-      } else {
-        headerAirlineLabel = `PNR ${pnrDisplay} • ${legs.length} flights`;
-      }
-
-      // Merge pax names across all legs
+      // Merge passengers across legs
       const groupPaxNames = normalizePassengerNames(
-        legs.flatMap((leg) =>
-          Array.isArray(leg.paxNames) ? leg.paxNames : []
-        )
+        legs.flatMap((leg) => (Array.isArray(leg.paxNames) ? leg.paxNames : []))
       );
       const paxList = groupPaxNames.length
         ? groupPaxNames
         : (Array.isArray(first.paxNames) ? first.paxNames : []);
 
-      // Build per-leg mini lines for multi-leg group
-      let legsHtml = "";
-      if (isMulti) {
-        legsHtml =
-          '<div class="flight-legs-list">' +
-          legs
-            .map((leg) => {
-              const r = leg.route || {};
-              const d = r.departure || {};
-              const a = r.arrival || {};
-              const codeDep = d.iata || d.icao || "";
-              const codeArr = a.iata || a.icao || "";
-              const timeDep = extractTime(d.scheduled);
-              const timeArr = extractTime(a.scheduled);
-              const fn = (r.flightNumber || "").toString();
-              const airlineName = r.airline || "";
-              const left = `${codeDep || "—"} ${timeDep || ""}`.trim();
-              const right = `${codeArr || "—"} ${timeArr || ""}`.trim();
-              const middle = `${airlineName} ${fn}`.trim();
-              return `
-                <div class="flight-leg-line">
-                  <span class="flight-leg-left">${left}</span>
-                  <span class="flight-leg-middle">${middle || "&nbsp;"}</span>
-                  <span class="flight-leg-right">${right}</span>
+      // Build “itinerary style” stacked segments:
+      //   [Departure]  (leg 0)
+      //   [Layover]    (between legs)
+      //   [Connecting flight] (leg 1 / 2 / …)
+      let segmentsHtml = "";
+
+      for (let i = 0; i < legs.length; i++) {
+        const leg = legs[i];
+        const r = leg.route || {};
+        const d = r.departure || {};
+        const a = r.arrival || {};
+
+        const airlineName = r.airline || "";
+        const fn = (r.flightNumber || "").toString();
+        const legLabel = i === 0 ? "Departure" : "Connecting flight";
+
+        const depCity = d.airport || d.iata || d.icao || "—";
+        const depCode = d.iata || d.icao || "";
+        const depTime = extractTime(d.scheduled);
+
+        const arrCity = a.airport || a.iata || a.icao || "—";
+        const arrCode = a.iata || a.icao || "";
+        const arrTime = extractTime(a.scheduled);
+
+        segmentsHtml += `
+          <div class="itinerary-segment segment-flight">
+            <div class="segment-header-row">
+              <span class="segment-label">${legLabel}</span>
+              <span class="segment-flight-code">
+                ${[airlineName, fn].filter(Boolean).join(" ") || "Flight"}
+              </span>
+            </div>
+            <div class="segment-main-row">
+              <div class="segment-side">
+                <div class="segment-city">${depCity}</div>
+                <div class="segment-code-time">
+                  <span class="segment-code">${depCode}</span>
+                  <span class="segment-time">${depTime || ""}</span>
                 </div>
-              `;
-            })
-            .join("") +
-          "</div>";
+              </div>
+              <div class="segment-arrow">
+                <span class="segment-plane-icon">✈︎</span>
+              </div>
+              <div class="segment-side segment-side-right">
+                <div class="segment-city">${arrCity}</div>
+                <div class="segment-code-time">
+                  <span class="segment-code">${arrCode}</span>
+                  <span class="segment-time">${arrTime || ""}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Layover after this leg (except after the last)
+        if (i < legs.length - 1) {
+          const nextLeg = legs[i + 1];
+          const nextRoute = nextLeg.route || {};
+          const nextDep = nextRoute.departure || {};
+
+          const layoverMins = computeDurationMinutes(a.scheduled, nextDep.scheduled);
+          const layoverDuration = formatDuration(layoverMins) || "Layover";
+
+          const layoverAirportName = a.airport || "";
+          const layoverCode = a.iata || a.icao || "";
+
+          let layoverText = layoverDuration;
+          if (layoverAirportName || layoverCode) {
+            layoverText += " in " + (layoverAirportName || layoverCode);
+            if (layoverCode) layoverText += ` (${layoverCode})`;
+          }
+
+          segmentsHtml += `
+            <div class="itinerary-segment segment-layover">
+              <div class="segment-header-row">
+                <span class="segment-label">Layover</span>
+                <span class="segment-icon">🕒</span>
+              </div>
+              <div class="segment-layover-text">
+                ${layoverText}
+              </div>
+            </div>
+          `;
+        }
       }
 
       const tile = document.createElement("div");
-      tile.className = "flight-tile";
+      tile.className = "flight-tile itinerary-tile";
 
       tile.innerHTML = `
         <div class="flight-tile-header">
@@ -580,31 +605,14 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
             <span class="event-type-icon event-type-icon-flight">✈︎</span>
             <span class="flight-date">${dateLabel}</span>
           </div>
-          <span class="flight-airline">${headerAirlineLabel}</span>
+          <span class="flight-airline">
+            PNR ${pnrDisplay}${isMulti ? ` • ${legs.length} flights` : ""}
+          </span>
         </div>
 
-        <div class="flight-route">
-          <div class="airport-info">
-            <div class="airport-code">${depCode || "—"}</div>
-            <div class="airport-time">${depTime || ""}</div>
-            <div class="airport-name">${depName || ""}</div>
-          </div>
-
-          <div class="flight-arrow">
-            →
-            <div class="flight-duration">${
-              durationLabel || (isMulti ? `${legs.length} flights` : "")
-            }</div>
-          </div>
-
-          <div class="airport-info">
-            <div class="airport-code">${arrCode || "—"}</div>
-            <div class="airport-time">${arrTime || ""}</div>
-            <div class="airport-name">${arrName || ""}</div>
-          </div>
+        <div class="itinerary-body">
+          ${segmentsHtml}
         </div>
-
-        ${legsHtml}
 
         <div class="flight-footer">
           <div class="flight-detail">
@@ -628,11 +636,13 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
       containerEl.appendChild(tile);
 
-    // ---- HOTELS ----
+    // =========================
+    // HOTEL
+    // =========================
     } else if (evt.type === "hotel") {
       const h = evt.hotel;
       const tile = document.createElement("div");
-      tile.className = "flight-tile"; // reuse same card style
+      tile.className = "flight-tile"; // reuse card style
 
       const checkInLabel = formatFriendlyDate(h.checkInDate);
       const checkOutLabel = formatFriendlyDate(h.checkOutDate);
@@ -696,6 +706,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     }
   }
 }
+
 
 // =========================
 // App bootstrap
