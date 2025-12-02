@@ -311,24 +311,16 @@ function renderTripFlights(trip, containerEl, summaryEl) {
 
   if (summaryEl) {
     const count = records.length;
-    const createdDate = trip.createdAt
-      ? new Date(trip.createdAt).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "short",
-          day: "numeric"
-        })
-      : "";
     summaryEl.textContent =
       count === 0
         ? `${trip.name} • no flights yet`
         : `${trip.name} • ${count} flight${count > 1 ? "s" : ""}`;
-    if (createdDate) summaryEl.textContent += ` • ${createdDate}`;
   }
 
   if (records.length === 0) {
     const empty = document.createElement("div");
     empty.className = "tiles-empty";
-    empty.textContent = "No flights in this trip yet. Click “Add flight” to create one.";
+    empty.textContent = "No flights in this trip yet. Use “Add flight” to create one.";
     containerEl.appendChild(empty);
     return;
   }
@@ -419,6 +411,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const tripFlightsSummary = document.getElementById("trip-flights-summary");
 
   const addFlightBtn = document.getElementById("add-flight-btn");
+  const flightOverlay = document.getElementById("flight-overlay");
+  const overlayCloseBtn = document.getElementById("close-flight-overlay");
+  const cancelFlightBtn = document.getElementById("cancel-flight-btn");
   const flightCard = document.querySelector(".card-flight");
 
   const form = document.getElementById("flight-form");
@@ -462,6 +457,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return false;
   }
 
+  function closeOverlay() {
+    flightOverlay.classList.add("hidden");
+    flightOverlay.setAttribute("aria-hidden", "true");
+  }
+
+  function openOverlay() {
+    flightOverlay.classList.remove("hidden");
+    flightOverlay.setAttribute("aria-hidden", "false");
+    flightCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   function updateAddFlightState() {
     if (hasTripChoice()) {
       addFlightBtn.disabled = false;
@@ -469,8 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       addFlightBtn.disabled = true;
       tripErrorEl.textContent = "Choose an existing trip or enter a new trip name.";
-      // Hide flight card when there is no trip choice
-      flightCard.classList.add("hidden");
+      closeOverlay();
     }
   }
 
@@ -566,10 +571,10 @@ document.addEventListener("DOMContentLoaded", () => {
     validateFormState();
   });
 
-  // Add flight button shows the form
+  // Add flight button shows the overlay
   addFlightBtn.addEventListener("click", () => {
     if (addFlightBtn.disabled) return;
-    flightCard.classList.remove("hidden");
+
     // reset flight-specific fields
     inputFlight.value = "";
     inputDate.value = "";
@@ -580,8 +585,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     outputEl.textContent = "{}";
     validateFormState();
+
+    openOverlay();
     inputFlight.focus();
-    flightCard.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  overlayCloseBtn.addEventListener("click", () => {
+    closeOverlay();
+  });
+
+  cancelFlightBtn.addEventListener("click", () => {
+    closeOverlay();
+  });
+
+  // Close overlay when clicking backdrop
+  flightOverlay.addEventListener("click", (e) => {
+    if (e.target === flightOverlay || e.target.classList.contains("overlay-backdrop")) {
+      closeOverlay();
+    }
   });
 
   // Flight form inputs -> validation
@@ -690,7 +711,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPassengerSelect(trips);
     renderTripFlights(currentTrip, tripFlightsList, tripFlightsSummary);
 
-    // Clear only flight fields; keep trip selection
+    // Clear flight fields
     inputFlight.value = "";
     inputDate.value = "";
     inputPaxNew.value = "";
@@ -700,8 +721,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     validateFormState();
 
-    // Hide form until user chooses "Add flight" again
-    flightCard.classList.add("hidden");
+    // Hide overlay until user chooses "Add flight" again
+    closeOverlay();
 
     // Alert summary
     alert(
