@@ -28,11 +28,11 @@ function normalizeFlightNumber(flightNumber) {
   return flightNumber.replace(/\s+/g, "").toUpperCase();
 }
 
-// 2 airline letters + optional space + 1–4 digits
+// 2–3 airline letters + optional space + 1–4 digits  (e.g. BA2785, EZY8449)
 function isValidFlightNumber(str) {
   if (!str) return false;
   const trimmed = str.trim().toUpperCase();
-  return /^[A-Z]{2}\s?\d{1,4}$/.test(trimmed);
+  return /^[A-Z]{2,3}\s?\d{1,4}$/.test(trimmed);
 }
 
 function loadTrips() {
