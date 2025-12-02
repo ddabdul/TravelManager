@@ -28,11 +28,13 @@ function normalizeFlightNumber(flightNumber) {
   return flightNumber.replace(/\s+/g, "").toUpperCase();
 }
 
-// 2–3 airline letters + optional space + 1–4 digits (e.g. BA2785, EZY8449)
+// IATA designator: 2–3 chars starting with a letter, next one or two can be letter or digit
+// then optional space + 1–4 digits
+// Examples: BA2785, EZY8449, U23493 (U2 3493)
 function isValidFlightNumber(str) {
   if (!str) return false;
   const trimmed = str.trim().toUpperCase();
-  return /^[A-Z]{2,3}\s?\d{1,4}$/.test(trimmed);
+  return /^[A-Z][A-Z0-9]{1,2}\s?\d{1,4}$/.test(trimmed);
 }
 
 function loadTrips() {
@@ -937,7 +939,7 @@ document.addEventListener("DOMContentLoaded", () => {
       flightErrorEl.textContent = "Please enter a flight number.";
     } else if (!isValidFlightNumber(flightRaw)) {
       ok = false;
-      flightErrorEl.textContent = "Flight number looks invalid. Example: EZY8449.";
+      flightErrorEl.textContent = "Flight number looks invalid. Use U2 for EasyJet.";
     } else {
       flightErrorEl.textContent = "";
     }
