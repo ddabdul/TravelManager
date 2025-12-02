@@ -28,7 +28,7 @@ function normalizeFlightNumber(flightNumber) {
   return flightNumber.replace(/\s+/g, "").toUpperCase();
 }
 
-// 2–3 airline letters + optional space + 1–4 digits  (e.g. BA2785, EZY8449)
+// 2–3 airline letters + optional space + 1–4 digits (e.g. BA2785, EZY8449)
 function isValidFlightNumber(str) {
   if (!str) return false;
   const trimmed = str.trim().toUpperCase();
@@ -188,13 +188,13 @@ function adjustIsoDateKeepingTime(isoString, newDateStr) {
 function cloneRouteWithDate(route, flightDate) {
   if (!route) return null;
   const cloned = JSON.parse(JSON.stringify(route));
-  if (cloned.departure && cloned.departure.scheduled) {
+  if (cloned.departure && cloned.departure.scheduled && flightDate) {
     cloned.departure.scheduled = adjustIsoDateKeepingTime(
       cloned.departure.scheduled,
       flightDate
     );
   }
-  if (cloned.arrival && cloned.arrival.scheduled) {
+  if (cloned.arrival && cloned.arrival.scheduled && flightDate) {
     cloned.arrival.scheduled = adjustIsoDateKeepingTime(
       cloned.arrival.scheduled,
       flightDate
@@ -640,6 +640,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const flightDateErrorEl = document.getElementById("flight-date-error");
   const paxErrorEl = document.getElementById("pax-error");
 
+  // Manual route elements
+  const manualRouteSection = document.getElementById("manual-route-section");
+  const manualRouteErrorEl = document.getElementById("manual-route-error");
+  const manualAirline = document.getElementById("manual-airline");
+  const manualFlightNumber = document.getElementById("manual-flight-number");
+  const manualDepAirport = document.getElementById("manual-dep-airport");
+  const manualDepIata = document.getElementById("manual-dep-iata");
+  const manualDepTime = document.getElementById("manual-dep-time");
+  const manualArrAirport = document.getElementById("manual-arr-airport");
+  const manualArrIata = document.getElementById("manual-arr-iata");
+  const manualArrTime = document.getElementById("manual-arr-time");
+
+  let manualRouteMode = false;
+
   // Hotel form elements
   const hotelForm = document.getElementById("hotel-form");
   const hotelSubmitBtn = hotelForm.querySelector('button[type="submit"]');
@@ -756,6 +770,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const newNames = getNewPassengerNames();
     const paxCount = normalizePassengerNames([...selectedExisting, ...newNames]).length;
 
+    manualRouteErrorEl.textContent = "";
+
     // Trip choice
     if (!hasTripChoice()) {
       ok = false;
@@ -770,7 +786,7 @@ document.addEventListener("DOMContentLoaded", () => {
       flightErrorEl.textContent = "Please enter a flight number.";
     } else if (!isValidFlightNumber(flightRaw)) {
       ok = false;
-      flightErrorEl.textContent = "Flight number looks invalid. Example: BA2785.";
+      flightErrorEl.textContent = "Flight number looks invalid. Example: EZY8449.";
     } else {
       flightErrorEl.textContent = "";
     }
@@ -789,6 +805,25 @@ document.addEventListener("DOMContentLoaded", () => {
       paxErrorEl.textContent = "Select or add at least one passenger.";
     } else {
       paxErrorEl.textContent = "";
+    }
+
+    // Manual route required fields (if in manual mode)
+    if (manualRouteMode) {
+      let manualOk = true;
+      if (!manualDepAirport.value.trim() || !manualArrAirport.value.trim()) {
+        manualOk = false;
+      }
+      if (!manualDepTime.value || !manualArrTime.value) {
+        manualOk = false;
+      }
+      if (!dateVal) {
+        manualOk = false;
+      }
+      if (!manualOk) {
+        ok = false;
+        manualRouteErrorEl.textContent =
+          "Please fill departure/arrival airports and times for the manual route.";
+      }
     }
 
     flightSubmitBtn.disabled = !ok;
@@ -880,6 +915,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Add flight button => open overlay ---
 
+  function resetManualRouteFields() {
+    manualRouteMode = false;
+    manualRouteSection.classList.add("hidden");
+    manualRouteErrorEl.textContent = "";
+    manualAirline.value = "";
+    manualFlightNumber.value = "";
+    manualDepAirport.value = "";
+    manualDepIata.value = "";
+    manualDepTime.value = "";
+    manualArrAirport.value = "";
+    manualArrIata.value = "";
+    manualArrTime.value = "";
+  }
+
   addFlightBtn.addEventListener("click", () => {
     if (addFlightBtn.disabled) return;
 
@@ -891,6 +940,7 @@ document.addEventListener("DOMContentLoaded", () => {
       Array.from(selectPaxExisting.options).forEach((opt) => (opt.selected = false));
     }
     outputEl.textContent = "{}";
+    resetManualRouteFields();
 
     validateFlightFormState();
     openFlightOverlay();
@@ -911,6 +961,15 @@ document.addEventListener("DOMContentLoaded", () => {
   inputDate.addEventListener("change", validateFlightFormState);
   selectPaxExisting.addEventListener("change", validateFlightFormState);
   inputPaxNew.addEventListener("input", validateFlightFormState);
+
+  manualAirline.addEventListener("input", validateFlightFormState);
+  manualFlightNumber.addEventListener("input", validateFlightFormState);
+  manualDepAirport.addEventListener("input", validateFlightFormState);
+  manualDepIata.addEventListener("input", validateFlightFormState);
+  manualDepTime.addEventListener("change", validateFlightFormState);
+  manualArrAirport.addEventListener("input", validateFlightFormState);
+  manualArrIata.addEventListener("input", validateFlightFormState);
+  manualArrTime.addEventListener("change", validateFlightFormState);
 
   // --- Flight form submit ---
 
@@ -946,50 +1005,117 @@ document.addEventListener("DOMContentLoaded", () => {
       renderTripSelect(trips, activeTripId);
     }
 
-    // Route: check cache first
-    let baseRoute = null;
+    let route;
     let routeSource = "api";
-    try {
-      const cachedRoute = findCachedRoute(trips, flightNumberRaw, flightDate);
-      if (cachedRoute) {
-        const depAirport = (cachedRoute.departure && cachedRoute.departure.airport) || "";
-        const depIata = (cachedRoute.departure && cachedRoute.departure.iata) || "";
-        const arrAirport = (cachedRoute.arrival && cachedRoute.arrival.airport) || "";
-        const arrIata = (cachedRoute.arrival && cachedRoute.arrival.iata) || "";
-        const routeSummary = `${depAirport} (${depIata}) → ${arrAirport} (${arrIata})`;
 
-        const msg =
-          `A saved route already exists for flight ${normalizeFlightNumber(
-            flightNumberRaw
-          )}.\n\n` +
-          `${routeSummary}\n\n` +
-          "Use this existing route (no API call)?\n\n" +
-          "OK = Use cached route\nCancel = Call the API again";
+    if (manualRouteMode) {
+      // Build route from manual fields, no API call
+      const airlineName = manualAirline.value.trim() || null;
+      const effectiveFlightNumber =
+        manualFlightNumber.value.trim() || normalizeFlightNumber(flightNumberRaw);
+      const depAirportName = manualDepAirport.value.trim() || null;
+      const depIata = manualDepIata.value.trim().toUpperCase() || null;
+      const arrAirportName = manualArrAirport.value.trim() || null;
+      const arrIata = manualArrIata.value.trim().toUpperCase() || null;
+      const depTime = manualDepTime.value || "00:00";
+      const arrTime = manualArrTime.value || "00:00";
 
-        const useCached = window.confirm(msg);
-        if (useCached) {
-          baseRoute = cachedRoute;
-          routeSource = "cache";
+      const depIso = `${flightDate}T${depTime}:00`;
+      const arrIso = `${flightDate}T${arrTime}:00`;
+
+      route = {
+        flightNumber: normalizeFlightNumber(effectiveFlightNumber),
+        airline: airlineName,
+        departure: {
+          airport: depAirportName,
+          iata: depIata,
+          icao: null,
+          scheduled: depIso
+        },
+        arrival: {
+          airport: arrAirportName,
+          iata: arrIata,
+          icao: null,
+          scheduled: arrIso
         }
-      }
+      };
+      routeSource = "manual";
+    } else {
+      // Cached route / API route
+      let baseRoute = null;
+      routeSource = "api";
 
-      if (!baseRoute) {
+      try {
+        const cachedRoute = findCachedRoute(trips, flightNumberRaw, flightDate);
+        if (cachedRoute) {
+          const depAirport =
+            (cachedRoute.departure && cachedRoute.departure.airport) || "";
+          const depIata =
+            (cachedRoute.departure && cachedRoute.departure.iata) || "";
+          const arrAirport =
+            (cachedRoute.arrival && cachedRoute.arrival.airport) || "";
+          const arrIata =
+            (cachedRoute.arrival && cachedRoute.arrival.iata) || "";
+          const routeSummary = `${depAirport} (${depIata}) → ${arrAirport} (${arrIata})`;
+
+          const msg =
+            `A saved route already exists for flight ${normalizeFlightNumber(
+              flightNumberRaw
+            )}.\n\n` +
+            `${routeSummary}\n\n` +
+            "Use this existing route (no API call)?\n\n" +
+            "OK = Use cached route\nCancel = Call the API again";
+
+          const useCached = window.confirm(msg);
+          if (useCached) {
+            baseRoute = cachedRoute;
+            routeSource = "cache";
+          }
+        }
+
+        if (!baseRoute) {
+          outputEl.textContent = JSON.stringify(
+            { status: "Loading route from API..." },
+            null,
+            2
+          );
+          baseRoute = await fetchRoute(flightNumberRaw);
+          routeSource = "api";
+        }
+      } catch (err) {
+        console.error("Error during route lookup:", err);
+
+        const wantManual = window.confirm(
+          "Could not find this flight via the API.\n\n" +
+            "Error: " +
+            err.message +
+            "\n\n" +
+            "Would you like to enter the route details manually?"
+        );
+
+        if (!wantManual) {
+          outputEl.textContent = JSON.stringify({ error: err.message }, null, 2);
+          return;
+        }
+
+        // Turn on manual mode & let user fill details, then resubmit
+        manualRouteMode = true;
+        manualRouteSection.classList.remove("hidden");
         outputEl.textContent = JSON.stringify(
-          { status: "Loading route from API..." },
+          {
+            status:
+              "Manual route entry enabled. Fill in the fields below and press Save again."
+          },
           null,
           2
         );
-        baseRoute = await fetchRoute(flightNumberRaw);
-        routeSource = "api";
+        validateFlightFormState();
+        return;
       }
-    } catch (err) {
-      console.error("Error during route lookup:", err);
-      outputEl.textContent = JSON.stringify({ error: err.message }, null, 2);
-      return;
+
+      route = cloneRouteWithDate(baseRoute, flightDate);
     }
 
-    // Adjust route dates to flightDate
-    const route = cloneRouteWithDate(baseRoute, flightDate);
     const routeForPreview = { ...route, _source: routeSource };
     outputEl.textContent = JSON.stringify(routeForPreview, null, 2);
 
@@ -1023,16 +1149,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!selectPaxExisting.disabled) {
       Array.from(selectPaxExisting.options).forEach((opt) => (opt.selected = false));
     }
+    resetManualRouteFields();
     validateFlightFormState();
 
     closeFlightOverlay();
 
     alert(
       `Saved flight to trip "${currentTrip.name}":\n` +
-        `• Flight: ${normalizeFlightNumber(flightNumberRaw)} on ${flightDate}\n` +
+        `• Flight: ${normalizeFlightNumber(
+          manualRouteMode ? manualFlightNumber.value || flightNumberRaw : flightNumberRaw
+        )} on ${flightDate}\n` +
         `• Passengers: ${paxNames.join(", ")}\n` +
         (record.pnr ? `• PNR: ${record.pnr}\n` : "") +
-        `Source: ${routeSource === "cache" ? "existing route" : "API"}`
+        `Source: ${
+          routeSource === "cache" ? "existing route" : routeSource === "manual" ? "manual" : "API"
+        }`
     );
   });
 
