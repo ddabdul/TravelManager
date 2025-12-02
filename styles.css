@@ -38,7 +38,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Generic hide helper */
 .hidden {
   display: none !important;
 }
@@ -108,21 +107,28 @@ body {
 }
 
 .topbar-right {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-/* Layout columns */
+.topbar-actions {
+  display: flex;
+  gap: 6px;
+}
 
+/* tiny buttons for topbar */
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+/* Layout columns: now effectively single column */
 .layout-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
-}
-
-@media (max-width: 880px) {
-  .layout-columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Panels */
@@ -187,12 +193,11 @@ body {
 
 .card-flight,
 .card-trip,
-.card-tiles,
-.card-data {
+.card-tiles {
   padding-bottom: 18px;
 }
 
-/* Chips / badges */
+/* Chips */
 
 .chip {
   font-size: 11px;
@@ -359,8 +364,6 @@ small {
   box-shadow: 0 0 0 rgba(0,0,0,0);
 }
 
-/* Disabled button look */
-
 .btn[disabled],
 .btn:disabled {
   cursor: default;
@@ -392,7 +395,7 @@ small {
   line-height: 1;
 }
 
-/* JSON blocks */
+/* JSON preview for last route */
 
 .json-block {
   background: rgba(244,244,248,0.9);
@@ -435,10 +438,6 @@ small {
   border-top: 1px solid rgba(0,0,0,0.06);
 }
 
-.secondary-card-json {
-  margin-top: 18px;
-}
-
 @media (prefers-color-scheme: dark) {
   .secondary-card {
     border-top-color: rgba(255,255,255,0.12);
@@ -463,7 +462,7 @@ small {
   color: var(--text-secondary);
 }
 
-/* Subtle inline error text */
+/* Errors */
 
 .field-error {
   min-height: 14px;
@@ -479,20 +478,29 @@ small {
   }
 }
 
-/* =========================
-   Tiles: flights in selected trip
-   ========================= */
+/* Tiles header: left, center, right */
 
 .tiles-header-row {
+  display: flex;
   align-items: center;
+  gap: 12px;
 }
 
-.tiles-header-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
+.tiles-header-left {
+  flex: 1;
 }
+
+.tiles-header-center {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+}
+
+.tiles-header-right {
+  flex: 0 0 auto;
+}
+
+/* Tiles container */
 
 .tiles-grid {
   display: flex;
@@ -500,7 +508,7 @@ small {
   gap: 12px;
 }
 
-/* More compact Flight Tile */
+/* Compact flight tile (unchanged logic, smaller look) */
 
 .flight-tile {
   max-width: 440px;
@@ -520,8 +528,6 @@ small {
   border-color: #0066cc;
   transform: translateY(-1px);
 }
-
-/* Header: date + airline pill */
 
 .flight-tile-header {
   display: flex;
@@ -546,8 +552,6 @@ small {
   border-radius: 4px;
   white-space: nowrap;
 }
-
-/* Main route row */
 
 .flight-route {
   display: flex;
@@ -581,8 +585,6 @@ small {
   line-height: 1.4;
 }
 
-/* Arrow + duration */
-
 .flight-arrow {
   flex: 0 0 34px;
   text-align: center;
@@ -596,8 +598,6 @@ small {
   color: #666666;
   margin-top: 2px;
 }
-
-/* Footer: booking ref + passengers */
 
 .flight-footer {
   display: flex;
@@ -648,17 +648,13 @@ small {
   white-space: nowrap;
 }
 
-/* Empty state */
-
 .tiles-empty {
   font-size: 12px;
   color: var(--text-secondary);
   padding: 10px 4px;
 }
 
-/* =========================
-   Overlay for New Flight
-   ========================= */
+/* Overlay (unchanged) */
 
 .overlay {
   position: fixed;
