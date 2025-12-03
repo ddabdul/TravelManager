@@ -800,4 +800,124 @@ small {
 }
 
 .flight-detail {
-  dis
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flight-detail-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.flight-detail-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.passenger-names {
+  flex: 1;
+}
+
+.passenger-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.passenger-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Empty state */
+
+.tiles-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 10px 4px;
+}
+
+/* Overlay (flight & hotel forms) */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+}
+
+.overlay-card {
+  position: relative;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 16px;
+  z-index: 41;
+}
+
+.overlay-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.overlay-close-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Generic hidden helper */
+.hidden {
+  display: none !important;
+}
+
+/* Manual route section */
+.manual-route {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(0,0,0,0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .manual-route {
+    border-top-color: rgba(255,255,255,0.18);
+  }
+}
+
+.manual-route-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+/* Overlay buttons alignment */
+.overlay-actions {
+  justify-content: flex-end;
+}
