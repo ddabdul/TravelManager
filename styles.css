@@ -33,8 +33,7 @@ body {
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont,
     "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at top left, #ffffff, var(--bg));
+  background: radial-gradient(circle at top left, #ffffff, var(--bg));
   color: var(--text-main);
   -webkit-font-smoothing: antialiased;
 }
@@ -53,7 +52,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
   padding: 16px 22px;
   border-radius: 999px;
   background: rgba(255,255,255,0.9);
@@ -73,7 +71,6 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  min-width: 0;
 }
 
 .topbar-icon {
@@ -88,42 +85,52 @@ body {
   color: #fff;
   font-weight: 600;
   font-size: 22px;
-  flex-shrink: 0;
 }
 
 .topbar-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 
 .topbar-title {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  white-space: nowrap;
 }
 
 .topbar-subtitle {
   font-size: 13px;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 14px;
-  flex-shrink: 0;
 }
 
 .topbar-actions {
   display: flex;
   gap: 8px;
-  flex-wrap: nowrap;
+}
+
+/* Mobile topbar tweaks */
+@media (max-width: 640px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+  .topbar-right {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .topbar-actions {
+    margin-left: auto;
+  }
 }
 
 /* Layout */
@@ -369,7 +376,23 @@ small {
   line-height: 1;
 }
 
-/* JSON block (for raw debug view, if present) */
+/* Small "SF Symbol" style emoji icons */
+
+.sf-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.sf-icon-key {
+  color: var(--text-secondary);
+}
+
+/* JSON block (debug view if present) */
 
 .json-block {
   background: rgba(244,244,248,0.9);
@@ -430,7 +453,6 @@ small {
 .api-status-text {
   font-size: 11px;
   color: var(--text-secondary);
-  white-space: nowrap;
 }
 
 /* Subtle inline error text */
@@ -491,12 +513,138 @@ small {
   margin-top: 8px;
 }
 
-/* Slightly denser card for itineraries */
+/* Slightly denser card for per-day itineraries */
+
 .itinerary-tile {
   padding: 14px 16px 12px;
 }
 
-/* Container for stacked segments (departure, layover, connecting, etc.) */
+/* Trip name “pill” */
+
+.trip-name-summary {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--card-bg);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (prefers-color-scheme: dark) {
+  .trip-name-summary {
+    background: #111111;
+    border-color: rgba(255,255,255,0.12);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.75);
+  }
+}
+
+/* Flight / hotel “day cards” */
+
+.flight-tile {
+  background: var(--card-bg);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  cursor: default;
+}
+
+.flight-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15,23,42,0.14);
+  border-color: var(--accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .flight-tile {
+    background: #111111;
+    border-color: rgba(255,255,255,0.08);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.7);
+  }
+
+  .flight-tile:hover {
+    border-color: rgba(10,132,255,0.9);
+  }
+}
+
+/* Header: icon + date on left, badge on right */
+
+.flight-tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  .flight-tile-header {
+    border-bottom-color: rgba(255,255,255,0.08);
+  }
+}
+
+.flight-tile-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flight-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.flight-airline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--accent-soft);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Event type icons (day-level) */
+
+.event-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.event-type-icon-flight {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.event-type-icon-hotel {
+  background: rgba(250,204,21,0.20); /* yellowish */
+  color: #b35b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .event-type-icon-hotel {
+    background: rgba(250,204,21,0.28);
+    color: #f5f5f7;
+  }
+}
+
+/* Itinerary body: stacked segments */
+
 .itinerary-body {
   margin-top: 8px;
   display: flex;
@@ -504,7 +652,8 @@ small {
   gap: 8px;
 }
 
-/* Individual segment “pills” – glassy cards inside the main tile */
+/* Generic segment container (flight leg, layover, hotel) */
+
 .itinerary-segment {
   border-radius: 12px;
   padding: 8px 10px;
@@ -512,25 +661,34 @@ small {
   background: rgba(244, 244, 248, 0.9);
 }
 
-.segment-flight {
-  /* nothing extra yet, but left for future tweaks */
-}
-
-.segment-layover {
-  background: rgba(244, 244, 248, 0.8);
-}
-
 @media (prefers-color-scheme: dark) {
   .itinerary-segment {
     background: rgba(28, 28, 30, 0.9);
     border-color: rgba(255, 255, 255, 0.06);
   }
+}
+
+/* Layover + hotel variants */
+
+.segment-layover {
+  background: rgba(244, 244, 248, 0.8);
+}
+
+.segment-hotel {
+  background: rgba(255, 249, 230, 0.95);
+}
+
+@media (prefers-color-scheme: dark) {
   .segment-layover {
     background: rgba(44, 44, 46, 0.9);
   }
+  .segment-hotel {
+    background: rgba(64, 58, 36, 0.95);
+  }
 }
 
-/* Segment header: label (DEPARTURE / LAYOVER / CONNECTING FLIGHT) + small code */
+/* Segment header: label + small right text */
+
 .segment-header-row {
   display: flex;
   justify-content: space-between;
@@ -554,10 +712,20 @@ small {
 }
 
 .segment-icon {
-  font-size: 13px;
+  font-size: 16px;
+  line-height: 1;
 }
 
-/* Main row inside a flight segment: origin → dest */
+.segment-icon-flight {
+  color: var(--accent);
+}
+
+.segment-icon-hotel {
+  color: #b35b00;
+}
+
+/* Main row inside a segment: origin → dest */
+
 .segment-main-row {
   display: flex;
   align-items: center;
@@ -604,196 +772,17 @@ small {
   color: var(--text-secondary);
 }
 
-.segment-plane-icon {
-  font-size: 14px;
-}
+/* Layover copy + hotel footer text */
 
-/* Layover copy */
 .segment-layover-text {
   margin-top: 4px;
   font-size: 11px;
   color: var(--text-secondary);
 }
 
-/* Header-left (date + icon) already existed but we ensure flex layout works nicely */
-.flight-tile-header-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-
-/* Trip name “tile” */
-
-.trip-name-summary {
-  flex: 1;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-main);
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--card-bg);
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 10px 24px rgba(0,0,0,0.06);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-@media (prefers-color-scheme: dark) {
-  .trip-name-summary {
-    background: #111111;
-    border-color: rgba(255,255,255,0.12);
-    box-shadow: 0 10px 24px rgba(0,0,0,0.75);
-  }
-}
-
-/* Flight / hotel tiles */
-
-.flight-tile {
-  background: var(--card-bg);
-  border: 1px solid rgba(0,0,0,0.06);
-  border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-  cursor: default;
-}
-
-.flight-tile:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(15,23,42,0.14);
-  border-color: var(--accent);
-}
-
-@media (prefers-color-scheme: dark) {
-  .flight-tile {
-    background: #111111;
-    border-color: rgba(255,255,255,0.08);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.7);
-  }
-
-  .flight-tile:hover {
-    border-color: rgba(10,132,255,0.9);
-  }
-}
-
-/* Header: icon + date on left, airline on right */
-
-.flight-tile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-}
-
-@media (prefers-color-scheme: dark) {
-  .flight-tile-header {
-    border-bottom-color: rgba(255,255,255,0.08);
-  }
-}
-
-.flight-tile-header-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.flight-date {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.flight-airline {
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: var(--accent-soft);
-  padding: 3px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-/* Event type icons */
-
-.event-type-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  font-size: 11px;
-}
-
-.event-type-icon-flight {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.event-type-icon-hotel {
-  background: rgba(250,204,21,0.20);
-  color: #b35b00;
-}
-
-@media (prefers-color-scheme: dark) {
-  .event-type-icon-hotel {
-    background: rgba(250,204,21,0.28);
-    color: #f5f5f7;
-  }
-}
-
-/* Route layout */
-
-.flight-route {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 8px;
-}
-
-.airport-info {
-  flex: 1;
-  text-align: center;
-}
-
-.airport-code {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 2px;
-}
-
-.airport-time {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.airport-name {
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.3;
-}
-
-.flight-arrow {
-  flex: 0 0 40px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-weight: 300;
-  font-size: 17px;
-}
-
-.flight-duration {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-}
+/* Passengers in journey footer use existing .passenger-list styles */
 
 /* Footer: booking + passengers/guests */
-
 .flight-footer {
   display: flex;
   justify-content: space-between;
@@ -811,234 +800,4 @@ small {
 }
 
 .flight-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.flight-detail-label {
-  font-size: 10px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.flight-detail-value {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.passenger-names {
-  flex: 1;
-}
-
-.passenger-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.passenger-name {
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--accent-soft);
-  padding: 2px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-/* Empty state */
-
-.tiles-empty {
-  font-size: 12px;
-  color: var(--text-secondary);
-  padding: 10px 4px;
-}
-
-/* Overlay (flight & hotel forms) */
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.overlay.hidden {
-  display: none;
-}
-
-.overlay-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(10px);
-}
-
-.overlay-card {
-  position: relative;
-  max-width: 640px;
-  width: 100%;
-  margin: 0 16px;
-  z-index: 41;
-}
-
-.overlay-close-btn {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  border: none;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  color: var(--text-secondary);
-}
-
-.overlay-close-btn:hover {
-  transform: scale(1.05);
-}
-
-/* Generic hidden helper */
-.hidden {
-  display: none !important;
-}
-
-/* Manual route section */
-.manual-route {
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(0,0,0,0.12);
-}
-
-@media (prefers-color-scheme: dark) {
-  .manual-route {
-    border-top-color: rgba(255,255,255,0.18);
-  }
-}
-
-.manual-route-header {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.flight-tile-header-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.event-type-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 11px;
-}
-
-.event-type-icon-flight {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.event-type-icon-hotel {
-  background: rgba(52,199,89,0.16);
-  color: #34c759;
-}
-
-/* Multi-leg detail lines inside a grouped flight tile */
-.flight-legs-list {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.flight-leg-line {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.flight-leg-left,
-.flight-leg-right {
-  white-space: nowrap;
-}
-
-.flight-leg-middle {
-  flex: 1;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.overlay-actions {
-  justify-content: flex-end;
-}
-
-/* ---------- Mobile layout for top bar ---------- */
-
-@media (max-width: 720px) {
-  .app-shell {
-    padding: 18px 12px 32px;
-  }
-
-  .topbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-    padding: 14px 14px 12px;
-    border-radius: 24px;
-  }
-
-  .topbar-left {
-    justify-content: flex-start;
-  }
-
-  .topbar-icon {
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
-    border-radius: 12px;
-  }
-
-  .topbar-title {
-    font-size: 20px;
-  }
-
-  .topbar-subtitle {
-    font-size: 12px;
-    white-space: normal; /* allow wrapping on mobile */
-  }
-
-  .topbar-right {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .api-status-text {
-    white-space: normal;
-  }
-
-  .topbar-actions {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .topbar-actions .btn-xs {
-    flex: 1 1 30%;
-    justify-content: center;
-  }
-}
+  dis
