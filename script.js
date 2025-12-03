@@ -394,18 +394,18 @@ function buildTripEvents(trip) {
 
       let baseSort;
       if (depIso) {
-        baseSort = depIso; // precise time if we have it
+        baseSort = depIso; // have real time
       } else if (rec.flightDate) {
         baseSort = rec.flightDate + "T00:00:00";
       } else {
         baseSort = rec.createdAt || "";
       }
 
-      // Only group when we have both a PNR and a date
+      // Only group connecting flights when we have both a PNR and a date
       const hasPnrAndDate = rec.pnr && rec.flightDate;
       const key = hasPnrAndDate
         ? `PNR__${rec.flightDate}__${rec.pnr}`
-        : `FLIGHT__${rec.id}`;
+        : `FLIGHT__${rec.id}`; // single-leg "journey"
 
       let group = groups.get(key);
       if (!group) {
@@ -446,7 +446,7 @@ function buildTripEvents(trip) {
     return day;
   }
 
-  // Place flight groups into days
+  // Put flight groups into days
   for (const group of groups.values()) {
     const dateKey =
       (group.flightDate && group.flightDate.slice(0, 10)) ||
@@ -460,14 +460,14 @@ function buildTripEvents(trip) {
     }
   }
 
-  // Hotels → days
+  // Put hotels into days
   if (Array.isArray(trip.hotels)) {
     for (const h of trip.hotels) {
       if (!h || typeof h !== "object") continue;
 
       let datePart = "";
       if (h.checkInDate) {
-        datePart = h.checkInDate;                 // YYYY-MM-DD
+        datePart = h.checkInDate; // YYYY-MM-DD
       } else if (h.createdAt) {
         datePart = String(h.createdAt).slice(0, 10);
       }
@@ -491,7 +491,7 @@ function buildTripEvents(trip) {
 
   const days = Array.from(dayMap.values());
 
-  // Sort flights + hotels inside each day by their time
+  // Sort flights + hotels inside each day by their own sortKey
   for (const day of days) {
     day.flights.sort((a, b) => {
       const sa = a.sortKey || "";
@@ -518,7 +518,8 @@ function buildTripEvents(trip) {
   return days;
 }
 
-// Render per-day tiles, each containing all flights + hotels for that date
+// Render per-day tiles, each containing all flights + hotels for that date.
+// Flights are grouped by PNR+date into stacked "journey" segments inside the day card.
 function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
   containerEl.innerHTML = "";
 
@@ -535,7 +536,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
   const days = buildTripEvents(trip);
 
-  // Count legs and hotels for the summary
+  // For the summary badge (top of panel)
   let totalFlightLegs = 0;
   let totalHotels = 0;
   for (const day of days) {
@@ -603,6 +604,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     }
     const badgeText = badgeParts.join(" • ");
 
+    // One card per day
     const tile = document.createElement("div");
     tile.className = "flight-tile itinerary-tile";
 
@@ -620,12 +622,12 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     const bodyEl = tile.querySelector(".itinerary-body");
     let segmentsHtml = "";
 
-    // ---------- Flights (grouped by PNR+date) ----------
+    // -------- Flights first (journeys) --------
     for (const group of day.flights) {
       const legs = (group.records || []).slice();
       if (!legs.length) continue;
 
-      // Sort legs by departure time
+      // Sort legs chronologically
       legs.sort((a, b) => {
         const ra = a.route || {};
         const rb = b.route || {};
@@ -637,16 +639,19 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       const first = legs[0];
       const pnrDisplay = group.pnr || first.pnr || "—";
 
-      // Merge passengers of all legs in this group
-      const groupPaxNames = normalizePassengerNames(
+      // Merge passengers across legs for this journey
+      const journeyPaxNames = normalizePassengerNames(
         legs.flatMap((leg) => (Array.isArray(leg.paxNames) ? leg.paxNames : []))
       );
       const paxListHtml =
-        groupPaxNames.length > 0
-          ? groupPaxNames
+        journeyPaxNames.length > 0
+          ? journeyPaxNames
               .map((name) => `<span class="passenger-name">${name}</span>`)
               .join("")
           : '<span class="passenger-name">None saved</span>';
+
+      // Journey container – reads as one trip with legs
+      segmentsHtml += `<div class="itinerary-segment journey-segment">`;
 
       for (let i = 0; i < legs.length; i++) {
         const leg = legs[i];
@@ -669,7 +674,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
         const headerRight = [airlineName, fn].filter(Boolean).join(" ");
 
         segmentsHtml += `
-          <div class="itinerary-segment segment-flight">
+          <div class="segment-flight">
             <div class="segment-header-row">
               <span class="segment-label">${legLabel}</span>
               <span class="segment-flight-code">
@@ -697,16 +702,10 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
                 </div>
               </div>
             </div>
-            <div class="segment-layover-text">
-              Passengers:
-              <span class="passenger-list">
-                ${paxListHtml}
-              </span>
-            </div>
           </div>
         `;
 
-        // Layover after this leg (except after the last)
+        // Layover after this leg (except the last leg of the journey)
         if (i < legs.length - 1) {
           const nextLeg = legs[i + 1];
           const nextRoute = nextLeg.route || {};
@@ -728,7 +727,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           }
 
           segmentsHtml += `
-            <div class="itinerary-segment segment-layover">
+            <div class="segment-layover">
               <div class="segment-header-row">
                 <span class="segment-label">Layover</span>
                 <span class="segment-icon">🕒</span>
@@ -740,9 +739,20 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           `;
         }
       }
+
+      // Journey footer – passengers for whole journey
+      segmentsHtml += `
+        <div class="segment-layover-text">
+          Passengers:
+          <span class="passenger-list">
+            ${paxListHtml}
+          </span>
+        </div>
+      </div>
+      `;
     }
 
-    // ---------- Hotels ----------
+    // -------- Hotels under flights --------
     for (const hEvt of day.hotels) {
       const h = hEvt.hotel;
       const checkInShort = formatShortDate(h.checkInDate);
@@ -792,6 +802,7 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     containerEl.appendChild(tile);
   }
 }
+
 
 
 // =========================
