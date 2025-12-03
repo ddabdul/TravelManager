@@ -376,15 +376,12 @@ function renderTripSelect(trips, activeTripId) {
   }
 }
 
-// Build combined events timeline (flights grouped by PNR+date + hotels)
-// Build combined events timeline (flights grouped by PNR+date + hotels)
-// Flights come before hotels when they fall on the same calendar day.
+// Build combined timeline grouped by day.
+// Each "day" contains 0..n flight groups and 0..n hotels.
 function buildTripEvents(trip) {
   if (!trip) return [];
 
-  const events = [];
-
-  // --- Group flights by (flightDate + PNR), so connecting flights share a tile ---
+  // --- 1) Group flights by (flightDate + PNR) so connecting flights share a group ---
   const groups = new Map();
 
   if (Array.isArray(trip.records)) {
@@ -424,72 +421,104 @@ function buildTripEvents(trip) {
 
       group.records.push(rec);
 
-      // Keep earliest departure as group sort key
       if (!group.sortKey || (baseSort && baseSort < group.sortKey)) {
         group.sortKey = baseSort;
       }
     }
   }
 
-  for (const group of groups.values()) {
-    events.push(group);
+  // --- 2) Build "days" with flights + hotels ---
+  const dayMap = new Map();
+
+  function ensureDay(dateKey) {
+    const key = dateKey || "";
+    let day = dayMap.get(key);
+    if (!day) {
+      day = {
+        type: "day",
+        date: key || null,   // "YYYY-MM-DD" or null
+        flights: [],         // array of flightGroup
+        hotels: [],          // array of { type:"hotel", hotel, sortKey }
+        sortKey: key ? key + "T00:00:00" : ""
+      };
+      dayMap.set(key, day);
+    }
+    return day;
   }
 
-  // --- Hotels ---
+  // Place flight groups into days
+  for (const group of groups.values()) {
+    const dateKey =
+      (group.flightDate && group.flightDate.slice(0, 10)) ||
+      (group.sortKey ? group.sortKey.slice(0, 10) : "");
+
+    const day = ensureDay(dateKey);
+    day.flights.push(group);
+
+    if (!day.sortKey || (group.sortKey && group.sortKey < day.sortKey)) {
+      day.sortKey = group.sortKey || day.sortKey;
+    }
+  }
+
+  // Hotels → days
   if (Array.isArray(trip.hotels)) {
     for (const h of trip.hotels) {
       if (!h || typeof h !== "object") continue;
 
-      // Prefer check-in date; fall back to createdAt’s date if needed
       let datePart = "";
       if (h.checkInDate) {
-        datePart = h.checkInDate;
+        datePart = h.checkInDate;                 // YYYY-MM-DD
       } else if (h.createdAt) {
-        datePart = String(h.createdAt).slice(0, 10); // YYYY-MM-DD
+        datePart = String(h.createdAt).slice(0, 10);
       }
 
       const sortKey = datePart
         ? `${datePart}T00:00:00`
-        : (h.createdAt || "");
+        : h.createdAt || "";
 
-      events.push({
+      const day = ensureDay(datePart);
+      day.hotels.push({
         type: "hotel",
         hotel: h,
         sortKey
       });
+
+      if (!day.sortKey || (sortKey && sortKey < day.sortKey)) {
+        day.sortKey = sortKey;
+      }
     }
   }
 
-  // --- Sort: by calendar day, then type (flights before hotels), then sortKey ---
-  for (const evt of events) {
-    const s = evt.sortKey || "";
-    evt._dateKey = s ? s.slice(0, 10) : "";           // YYYY-MM-DD
-    evt._kindPriority = evt.type === "hotel" ? 1 : 0; // 0 = flight, 1 = hotel
+  const days = Array.from(dayMap.values());
+
+  // Sort flights + hotels inside each day by their time
+  for (const day of days) {
+    day.flights.sort((a, b) => {
+      const sa = a.sortKey || "";
+      const sb = b.sortKey || "";
+      return sa.localeCompare(sb);
+    });
+    day.hotels.sort((a, b) => {
+      const sa = a.sortKey || "";
+      const sb = b.sortKey || "";
+      return sa.localeCompare(sb);
+    });
   }
 
-  events.sort((a, b) => {
-    const da = a._dateKey;
-    const db = b._dateKey;
-
-    if (da && db && da !== db) {
-      return da.localeCompare(db); // earlier day first
-    }
-
-    if (a._kindPriority !== b._kindPriority) {
-      // same day → flights first, then hotels
-      return a._kindPriority - b._kindPriority;
-    }
-
+  // Sort days by date, fallback to sortKey
+  days.sort((a, b) => {
+    const da = a.date || "";
+    const db = b.date || "";
+    if (da && db && da !== db) return da.localeCompare(db);
     const sa = a.sortKey || "";
     const sb = b.sortKey || "";
     return sa.localeCompare(sb);
   });
 
-  return events;
+  return days;
 }
 
-
-// Render combined events (flight groups + hotels) into the same tile list
+// Render per-day tiles, each containing all flights + hotels for that date
 function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
   containerEl.innerHTML = "";
 
@@ -504,20 +533,43 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     return;
   }
 
-  const events = buildTripEvents(trip);
+  const days = buildTripEvents(trip);
+
+  // Count legs and hotels for the summary
+  let totalFlightLegs = 0;
+  let totalHotels = 0;
+  for (const day of days) {
+    for (const fg of day.flights) {
+      totalFlightLegs += Array.isArray(fg.records) ? fg.records.length : 0;
+    }
+    totalHotels += day.hotels.length;
+  }
+  const totalEvents = totalFlightLegs + totalHotels;
 
   if (summaryEl) {
-    const count = events.length;
-    summaryEl.textContent =
-      count === 0
-        ? `${trip.name} • no events yet`
-        : `${trip.name} • ${count} event${count > 1 ? "s" : ""}`;
+    if (!totalEvents) {
+      summaryEl.textContent = `${trip.name} • no events yet`;
+    } else {
+      const parts = [];
+      if (totalFlightLegs) {
+        parts.push(
+          `${totalFlightLegs} flight${totalFlightLegs === 1 ? "" : "s"}`
+        );
+      }
+      if (totalHotels) {
+        parts.push(
+          `${totalHotels} hotel${totalHotels === 1 ? "" : "s"}`
+        );
+      }
+      summaryEl.textContent = `${trip.name} • ${parts.join(" • ")}`;
+    }
   }
+
   if (nameEl) {
     nameEl.textContent = trip.name;
   }
 
-  if (events.length === 0) {
+  if (!days.length) {
     const empty = document.createElement("div");
     empty.className = "tiles-empty";
     empty.textContent = "No events in this trip yet. Use “Add flight” or “Add hotel”.";
@@ -525,13 +577,53 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
     return;
   }
 
-  for (const evt of events) {
-    // =========================
-    // FLIGHT GROUP (1+ legs, grouped by PNR+date)
-    // =========================
-    if (evt.type === "flightGroup") {
-      const legs = (evt.records || []).slice();
-      if (legs.length === 0) continue;
+  for (const day of days) {
+    const dateLabel = day.date ? formatFriendlyDate(day.date) : "Undated";
+
+    const flightsCount = day.flights.reduce(
+      (acc, fg) => acc + (Array.isArray(fg.records) ? fg.records.length : 0),
+      0
+    );
+    const hotelsCount = day.hotels.length;
+
+    const headerIconClass =
+      flightsCount > 0 ? "event-type-icon-flight" : "event-type-icon-hotel";
+    const headerIconChar = flightsCount > 0 ? "✈︎" : "🏨";
+
+    const badgeParts = [];
+    if (flightsCount) {
+      badgeParts.push(
+        `${flightsCount} flight${flightsCount === 1 ? "" : "s"}`
+      );
+    }
+    if (hotelsCount) {
+      badgeParts.push(
+        `${hotelsCount} hotel${hotelsCount === 1 ? "" : "s"}`
+      );
+    }
+    const badgeText = badgeParts.join(" • ");
+
+    const tile = document.createElement("div");
+    tile.className = "flight-tile itinerary-tile";
+
+    tile.innerHTML = `
+      <div class="flight-tile-header">
+        <div class="flight-tile-header-left">
+          <span class="event-type-icon ${headerIconClass}">${headerIconChar}</span>
+          <span class="flight-date">${dateLabel}</span>
+        </div>
+        <span class="flight-airline">${badgeText}</span>
+      </div>
+      <div class="itinerary-body"></div>
+    `;
+
+    const bodyEl = tile.querySelector(".itinerary-body");
+    let segmentsHtml = "";
+
+    // ---------- Flights (grouped by PNR+date) ----------
+    for (const group of day.flights) {
+      const legs = (group.records || []).slice();
+      if (!legs.length) continue;
 
       // Sort legs by departure time
       legs.sort((a, b) => {
@@ -543,25 +635,18 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       });
 
       const first = legs[0];
-      const groupDate = first.flightDate || evt.flightDate || null;
-      const dateLabel = formatFriendlyDate(groupDate);
+      const pnrDisplay = group.pnr || first.pnr || "—";
 
-      const pnrDisplay = evt.pnr || first.pnr || "—";
-      const isMulti = legs.length > 1;
-
-      // Merge passengers across legs
+      // Merge passengers of all legs in this group
       const groupPaxNames = normalizePassengerNames(
         legs.flatMap((leg) => (Array.isArray(leg.paxNames) ? leg.paxNames : []))
       );
-      const paxList = groupPaxNames.length
-        ? groupPaxNames
-        : (Array.isArray(first.paxNames) ? first.paxNames : []);
-
-      // Build “itinerary style” stacked segments:
-      //   [Departure]  (leg 0)
-      //   [Layover]    (between legs)
-      //   [Connecting flight] (leg 1 / 2 / …)
-      let segmentsHtml = "";
+      const paxListHtml =
+        groupPaxNames.length > 0
+          ? groupPaxNames
+              .map((name) => `<span class="passenger-name">${name}</span>`)
+              .join("")
+          : '<span class="passenger-name">None saved</span>';
 
       for (let i = 0; i < legs.length; i++) {
         const leg = legs[i];
@@ -581,12 +666,16 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
         const arrCode = a.iata || a.icao || "";
         const arrTime = extractTime(a.scheduled);
 
+        const headerRight = [airlineName, fn].filter(Boolean).join(" ");
+
         segmentsHtml += `
           <div class="itinerary-segment segment-flight">
             <div class="segment-header-row">
               <span class="segment-label">${legLabel}</span>
               <span class="segment-flight-code">
-                ${[airlineName, fn].filter(Boolean).join(" ") || "Flight"}
+                ${headerRight || "Flight"}${
+                  pnrDisplay && pnrDisplay !== "—" ? ` • PNR ${pnrDisplay}` : ""
+                }
               </span>
             </div>
             <div class="segment-main-row">
@@ -608,6 +697,12 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
                 </div>
               </div>
             </div>
+            <div class="segment-layover-text">
+              Passengers:
+              <span class="passenger-list">
+                ${paxListHtml}
+              </span>
+            </div>
           </div>
         `;
 
@@ -617,7 +712,10 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           const nextRoute = nextLeg.route || {};
           const nextDep = nextRoute.departure || {};
 
-          const layoverMins = computeDurationMinutes(a.scheduled, nextDep.scheduled);
+          const layoverMins = computeDurationMinutes(
+            a.scheduled,
+            nextDep.scheduled
+          );
           const layoverDuration = formatDuration(layoverMins) || "Layover";
 
           const layoverAirportName = a.airport || "";
@@ -642,57 +740,11 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           `;
         }
       }
+    }
 
-      const tile = document.createElement("div");
-      tile.className = "flight-tile itinerary-tile";
-
-      tile.innerHTML = `
-        <div class="flight-tile-header">
-          <div class="flight-tile-header-left">
-            <span class="event-type-icon event-type-icon-flight">✈︎</span>
-            <span class="flight-date">${dateLabel}</span>
-          </div>
-          <span class="flight-airline">
-            PNR ${pnrDisplay}${isMulti ? ` • ${legs.length} flights` : ""}
-          </span>
-        </div>
-
-        <div class="itinerary-body">
-          ${segmentsHtml}
-        </div>
-
-        <div class="flight-footer">
-          <div class="flight-detail">
-            <span class="flight-detail-label">Booking Ref</span>
-            <span class="flight-detail-value">${pnrDisplay}</span>
-          </div>
-          <div class="passenger-names">
-            <span class="flight-detail-label">Passengers</span>
-            <div class="passenger-list">
-              ${
-                paxList && paxList.length
-                  ? paxList
-                      .map((name) => `<span class="passenger-name">${name}</span>`)
-                      .join("")
-                  : '<span class="passenger-name">None saved</span>'
-              }
-            </div>
-          </div>
-        </div>
-      `;
-
-      containerEl.appendChild(tile);
-
-    // =========================
-    // HOTEL
-    // =========================
-    } else if (evt.type === "hotel") {
-      const h = evt.hotel;
-      const tile = document.createElement("div");
-      tile.className = "flight-tile"; // reuse card style
-
-      const checkInLabel = formatFriendlyDate(h.checkInDate);
-      const checkOutLabel = formatFriendlyDate(h.checkOutDate);
+    // ---------- Hotels ----------
+    for (const hEvt of day.hotels) {
+      const h = hEvt.hotel;
       const checkInShort = formatShortDate(h.checkInDate);
       const checkOutShort = formatShortDate(h.checkOutDate);
       const nights = computeNights(h.checkInDate, h.checkOutDate);
@@ -704,51 +756,40 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       const paymentText =
         paymentType === "prepaid" ? "Already paid" : "Pay at hotel";
 
-      tile.innerHTML = `
-        <div class="flight-tile-header">
-          <div class="flight-tile-header-left">
-            <span class="event-type-icon event-type-icon-hotel">🏨</span>
-            <span class="flight-date">${checkInLabel}</span>
+      segmentsHtml += `
+        <div class="itinerary-segment segment-hotel">
+          <div class="segment-header-row">
+            <span class="segment-label">Hotel</span>
+            <span class="segment-flight-code">${h.hotelName || "Unnamed"}</span>
           </div>
-          <span class="flight-airline">Hotel • ${h.hotelName || "Unnamed"}</span>
-        </div>
-
-        <div class="flight-route">
-          <div class="airport-info">
-            <div class="airport-code">CHECK-IN</div>
-            <div class="airport-time">${checkInShort || ""}</div>
-          </div>
-
-          <div class="flight-arrow">
-            →
-            <div class="flight-duration">${nightsLabel}</div>
-          </div>
-
-          <div class="airport-info">
-            <div class="airport-code">CHECK-OUT</div>
-            <div class="airport-time">${checkOutShort || ""}</div>
-          </div>
-        </div>
-
-        <div class="flight-footer">
-          <div class="flight-detail">
-            <span class="flight-detail-label">Booking Ref</span>
-            <span class="flight-detail-value">${bookingId}</span>
-          </div>
-          <div class="passenger-names">
-            <span class="flight-detail-label">Guests</span>
-            <div class="passenger-list">
-              <span class="passenger-name">
-                ${pax} guest${pax === 1 ? "" : "s"}
-              </span>
-              <span class="passenger-name">${paymentText}</span>
+          <div class="segment-main-row">
+            <div class="segment-side">
+              <div class="segment-city">Check-in</div>
+              <div class="segment-code-time">
+                <span class="segment-code">${checkInShort || ""}</span>
+                <span class="segment-time"></span>
+              </div>
             </div>
+            <div class="segment-arrow">
+              <span class="segment-plane-icon">🏨</span>
+            </div>
+            <div class="segment-side segment-side-right">
+              <div class="segment-city">Check-out</div>
+              <div class="segment-code-time">
+                <span class="segment-code">${checkOutShort || ""}</span>
+                <span class="segment-time">${nightsLabel}</span>
+              </div>
+            </div>
+          </div>
+          <div class="segment-layover-text">
+            Booking: ${bookingId} • ${pax} guest${pax === 1 ? "" : "s"} • ${paymentText}
           </div>
         </div>
       `;
-
-      containerEl.appendChild(tile);
     }
+
+    bodyEl.innerHTML = segmentsHtml;
+    containerEl.appendChild(tile);
   }
 }
 
