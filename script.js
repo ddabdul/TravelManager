@@ -588,7 +588,8 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
     const headerIconClass =
       flightsCount > 0 ? "event-type-icon-flight" : "event-type-icon-hotel";
-    const headerIconChar = flightsCount > 0 ? "✈︎" : "🏨";
+    const headerIconChar = flightsCount > 0 ? "✈︎" : "🛏"; // bed.double.fill equivalent
+
 
     const badgeParts = [];
     if (flightsCount) {
@@ -686,9 +687,9 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
                   <span class="segment-time">${depTime || ""}</span>
                 </div>
               </div>
-              <div class="segment-arrow">
-                <span class="segment-plane-icon">✈︎</span>
-              </div>
+                <div class="segment-arrow">
+                  <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
+                </div>
               <div class="segment-side segment-side-right">
                 <div class="segment-city">${arrCity}</div>
                 <div class="segment-code-time">
@@ -770,9 +771,9 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
                 <span class="segment-time"></span>
               </div>
             </div>
-            <div class="segment-arrow">
-              <span class="segment-plane-icon">🏨</span>
-            </div>
+              <div class="segment-arrow">
+                <span class="segment-icon segment-icon-hotel" aria-hidden="true">🛏</span>
+              </div>
             <div class="segment-side segment-side-right">
               <div class="segment-city">Check-out</div>
               <div class="segment-code-time">
@@ -781,9 +782,11 @@ function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
               </div>
             </div>
           </div>
-          <div class="segment-layover-text">
-            Booking: ${bookingId} • ${pax} guest${pax === 1 ? "" : "s"} • ${paymentText}
-          </div>
+        <div class="segment-layover-text">
+          <span class="sf-icon sf-icon-key" aria-hidden="true">🔑</span>
+          <span>
+            Booking ${bookingId} • ${pax} guest${pax === 1 ? "" : "s"} • ${paymentText}
+          </span>
         </div>
       `;
     }
