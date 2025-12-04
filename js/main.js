@@ -1,0 +1,796 @@
+// =========================
+// Main App Entry Point
+// =========================
+
+import { loadTrips, saveTrips } from "./storage.js";
+import { loadApiKey, fetchRoute } from "./api.js";
+import { 
+  normalizePassengerNames, 
+  normalizeFlightNumber, 
+  isValidFlightNumber, 
+  cloneRouteWithDate, 
+  generateHotelId 
+} from "./utils.js";
+import { findCachedRoute } from "./data.js";
+import {
+  renderTripsJson,
+  renderTripSelect,
+  renderPassengerSelect,
+  renderHotelSelect,
+  renderTripEvents
+} from "./render.js";
+
+// -- Globals --
+let trips = [];
+let activeTripId = null;
+
+// -- DOM Elements (cached for use in event listeners) --
+const els = {};
+
+function cacheElements() {
+  const ids = [
+    "trip-existing", "trip-new-name", "trip-error", "trip-events-list",
+    "trip-events-summary", "add-flight-btn", "flight-overlay",
+    "close-flight-overlay", "cancel-flight-btn", "add-hotel-btn", "hotel-overlay",
+    "close-hotel-overlay", "cancel-hotel-btn", "flight-form", "output",
+    "flight-number", "flight-date", "pax-existing", "pax-new", "pnr",
+    "flight-error", "flight-date-error", "pax-error", "manual-route-section",
+    "manual-route-error", "manual-airline", "manual-flight-number", 
+    "manual-dep-airport", "manual-dep-iata", "manual-dep-time", 
+    "manual-arr-airport", "manual-arr-iata", "manual-arr-time", 
+    "hotel-form", "hotel-existing", "hotel-name", "hotel-pax", 
+    "hotel-checkin", "hotel-checkout", "hotel-payment", "hotel-id",
+    "hotel-name-error", "hotel-pax-error", "hotel-dates-error",
+    "import-json", "import-json-file", "download-json", "clear-json",
+    "api-key-status",
+    // All trips statistics card
+    "trip-stats-container", "trip-pax-container", "trip-details-empty",
+    // Trip selector layout containers
+    "trip-fields", "trip-existing-field", "trip-new-field",
+    // Mobile toggle button
+    "toggle-alltrips-btn"
+  ];
+  ids.forEach(id => els[id] = document.getElementById(id));
+  els.flightSubmitBtn = els["flight-form"]?.querySelector('button[type="submit"]');
+  els.hotelSubmitBtn = els["hotel-form"]?.querySelector('button[type="submit"]');
+}
+
+let manualRouteMode = false;
+
+// ------------------------------------------------------------------
+// Trip selector UI helper
+// - Show new-trip input only when __new__ selected
+// - Expand dropdown to full width otherwise
+// ------------------------------------------------------------------
+
+function updateTripNewFieldVisibility() {
+  const selectVal = els["trip-existing"]?.value;
+  const isNew = !selectVal || selectVal === "__new__";
+
+  const fieldsWrap = els["trip-fields"];
+  const newField = els["trip-new-field"];
+
+  if (!fieldsWrap || !newField) return;
+
+  if (isNew) {
+    newField.classList.remove("hidden");
+    fieldsWrap.classList.remove("trip-only-select");
+  } else {
+    newField.classList.add("hidden");
+    fieldsWrap.classList.add("trip-only-select");
+    if (els["trip-new-name"]) els["trip-new-name"].value = "";
+  }
+}
+
+// ------------------------------------------------------------------
+// Mobile toggle for “All Trips Statistics” card
+// Requires CSS: .card-trip-details {display:none on mobile}
+// and .card-trip-details.is-expanded {display:block}
+// ------------------------------------------------------------------
+
+function isMobileView() {
+  return window.matchMedia("(max-width: 720px)").matches;
+}
+
+function syncAllTripsToggle() {
+  const btn = els["toggle-alltrips-btn"];
+  const card = document.querySelector(".card-trip-details");
+  if (!btn || !card) return;
+
+  if (!isMobileView()) {
+    // Desktop: always show card, hide button
+    card.classList.remove("is-expanded");
+    card.style.display = "";
+    btn.style.display = "none";
+    btn.setAttribute("aria-expanded", "true");
+    return;
+  }
+
+  // Mobile: show button, card based on is-expanded
+  btn.style.display = "inline-flex";
+  const expanded = card.classList.contains("is-expanded");
+  btn.setAttribute("aria-expanded", expanded ? "true" : "false");
+  btn.textContent = expanded
+    ? "Hide all trips statistics"
+    : "Show all trips statistics";
+}
+
+// ------------------------------------------------------------------
+// Existing per-trip helpers (KEEP; still useful elsewhere)
+// ------------------------------------------------------------------
+
+function collectTripStats(trip) {
+  if (!trip) return { flights: 0, hotels: 0, passengers: [] };
+  
+  const flightCount = trip.records.length;
+  const hotelCount = trip.hotels.length;
+  
+  const uniquePax = new Set();
+  trip.records.forEach(r => r.paxNames.forEach(name => uniquePax.add(name)));
+  
+  return {
+    flights: flightCount,
+    hotels: hotelCount,
+    passengerCount: uniquePax.size,
+    passengers: Array.from(uniquePax).sort()
+  };
+}
+
+function renderTripDetails(trip, statsEl, paxEl, emptyEl) {
+  const hasData = trip && (trip.records.length > 0 || trip.hotels.length > 0);
+  
+  if (!hasData) {
+    statsEl.classList.add('hidden');
+    paxEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  
+  emptyEl.classList.add('hidden');
+  statsEl.classList.remove('hidden');
+  paxEl.classList.remove('hidden');
+  
+  const stats = collectTripStats(trip);
+  
+  statsEl.innerHTML = `
+    <div class="stat-item">
+      <div class="stat-label">Flights</div>
+      <div class="stat-value">${stats.flights}</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">Hotels</div>
+      <div class="stat-value">${stats.hotels}</div>
+    </div>
+  `;
+  
+  paxEl.innerHTML = `
+    <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">
+      Passengers (${stats.passengerCount})
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      ${stats.passengers.map(p => 
+        `<span class="badge">${p}</span>`
+      ).join('')}
+    </div>
+  `;
+}
+
+// ------------------------------------------------------------------
+// Global stats helpers for “All Trips Statistics” card
+// ------------------------------------------------------------------
+
+function parseDateOnly(isoOrDateStr) {
+  if (!isoOrDateStr) return null;
+  const d = new Date(isoOrDateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(checkInStr, checkOutStr) {
+  const inDate = parseDateOnly(checkInStr);
+  const outDate = parseDateOnly(checkOutStr);
+  if (!inDate || !outDate) return 0;
+
+  inDate.setHours(0, 0, 0, 0);
+  outDate.setHours(0, 0, 0, 0);
+
+  const diffMs = outDate - inDate;
+  const nights = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, nights);
+}
+
+function getTripDateRange(trip) {
+  let min = null;
+  let max = null;
+
+  for (const rec of (trip.records || [])) {
+    const depIso = rec.route?.departure?.scheduled;
+    const dateStr = depIso || rec.flightDate || rec.createdAt;
+    const d = parseDateOnly(dateStr);
+    if (!d) continue;
+    if (!min || d < min) min = d;
+    if (!max || d > max) max = d;
+  }
+
+  for (const h of (trip.hotels || [])) {
+    const d1 = parseDateOnly(h.checkInDate || h.createdAt);
+    const d2 = parseDateOnly(h.checkOutDate || h.createdAt);
+    const dates = [d1, d2].filter(Boolean);
+    for (const d of dates) {
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
+    }
+  }
+
+  return { start: min, end: max };
+}
+
+function collectAllTripsStats(allTrips) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const totalTrips = allTrips.length;
+
+  let totalFlights = 0;
+  let totalHotelNights = 0;
+
+  let pastTrips = 0, upcomingTrips = 0;
+  let pastFlights = 0, upcomingFlights = 0;
+  let pastHotelNights = 0, upcomingHotelNights = 0;
+
+  const paxTotals = new Map();
+
+  for (const trip of allTrips) {
+    if (!trip) continue;
+
+    const { end } = getTripDateRange(trip);
+    const isPastTrip = end && end < today;
+
+    if (isPastTrip) pastTrips++;
+    else upcomingTrips++;
+
+    for (const rec of (trip.records || [])) {
+      totalFlights++;
+
+      const depIso = rec.route?.departure?.scheduled;
+      const d = parseDateOnly(depIso || rec.flightDate || rec.createdAt);
+      const isPastFlight = d && d < today;
+
+      if (isPastFlight) pastFlights++;
+      else upcomingFlights++;
+
+      const paxNames = Array.isArray(rec.paxNames) ? rec.paxNames : [];
+      for (const rawName of paxNames) {
+        const name = String(rawName || "").trim();
+        if (!name) continue;
+
+        if (!paxTotals.has(name)) {
+          paxTotals.set(name, {
+            flights: 0,
+            pastFlights: 0,
+            upcomingFlights: 0,
+            trips: new Set()
+          });
+        }
+        const p = paxTotals.get(name);
+        p.flights++;
+        if (isPastFlight) p.pastFlights++;
+        else p.upcomingFlights++;
+        p.trips.add(trip.id);
+      }
+    }
+
+    for (const h of (trip.hotels || [])) {
+      const nights = daysBetween(h.checkInDate, h.checkOutDate);
+      totalHotelNights += nights;
+
+      const d = parseDateOnly(h.checkInDate || h.createdAt);
+      const isPastHotel = d && d < today;
+
+      if (isPastHotel) pastHotelNights += nights;
+      else upcomingHotelNights += nights;
+    }
+  }
+
+  const paxList = Array.from(paxTotals.entries())
+    .map(([name, v]) => ({
+      name,
+      flights: v.flights,
+      pastFlights: v.pastFlights,
+      upcomingFlights: v.upcomingFlights,
+      tripCount: v.trips.size
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    totalTrips,
+    totalFlights,
+    totalHotelNights,
+
+    pastTrips,
+    upcomingTrips,
+    pastFlights,
+    upcomingFlights,
+    pastHotelNights,
+    upcomingHotelNights,
+
+    paxList
+  };
+}
+
+function renderAllTripsDetails(allTrips, statsEl, paxEl, emptyEl) {
+  const hasData =
+    Array.isArray(allTrips) &&
+    allTrips.some(t => (t?.records?.length || 0) > 0 || (t?.hotels?.length || 0) > 0);
+
+  if (!hasData) {
+    statsEl.classList.add('hidden');
+    paxEl.classList.add('hidden');
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  statsEl.classList.remove('hidden');
+  paxEl.classList.remove('hidden');
+
+  const s = collectAllTripsStats(allTrips);
+
+  const statCards = [
+    { label: "Trips", total: s.totalTrips, past: s.pastTrips, upcoming: s.upcomingTrips },
+    { label: "Flights", total: s.totalFlights, past: s.pastFlights, upcoming: s.upcomingFlights },
+    { label: "Hotel Nights", total: s.totalHotelNights, past: s.pastHotelNights, upcoming: s.upcomingHotelNights }
+  ];
+
+  statsEl.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+      ${statCards.map(card => `
+        <div class="secondary-card" style="padding: 10px 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:600;">${card.label}</div>
+            <div style="font-size:18px; font-weight:700;">${card.total}</div>
+          </div>
+          <div style="margin-top:6px; font-size:12px; color:var(--text-secondary);">
+            Past: ${card.past} &nbsp;•&nbsp; Upcoming: ${card.upcoming}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  if (!s.paxList.length) {
+    paxEl.innerHTML = `<div class="tiles-empty">No passengers recorded yet.</div>`;
+    return;
+  }
+
+  paxEl.innerHTML = `
+    <div style="font-size: 14px; font-weight: 600; margin: 10px 0 8px;">
+      Passengers (${s.paxList.length})
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+      ${s.paxList.map(p => `
+        <div class="secondary-card" style="padding: 10px 12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:600;">${p.name}</div>
+            <div class="tag-soft">${p.tripCount} trip${p.tripCount === 1 ? "" : "s"}</div>
+          </div>
+          <div style="margin-top:6px; font-size:12px; color:var(--text-secondary);">
+            Flights: <b>${p.flights}</b>
+            &nbsp;•&nbsp; Past: ${p.pastFlights}
+            &nbsp;•&nbsp; Upcoming: ${p.upcomingFlights}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// -- Initialization --
+
+async function init() {
+  cacheElements();
+  trips = loadTrips();
+  activeTripId = trips.length ? trips[0].id : null;
+
+  renderAll();
+  updateTripNewFieldVisibility();
+  syncAllTripsToggle();
+  
+  if (els["api-key-status"]) els["api-key-status"].textContent = "Loading configuration...";
+  const keyStatus = await loadApiKey();
+  if (els["api-key-status"]) els["api-key-status"].textContent = keyStatus.message;
+
+  updateAddFlightState();
+  updateAddHotelState();
+  setupEventListeners();
+
+  window.addEventListener("resize", syncAllTripsToggle);
+}
+
+function renderAll() {
+  renderTripsJson(trips);
+  renderTripSelect(trips, activeTripId);
+  renderPassengerSelect(trips);
+  renderHotelSelect(trips);
+  
+  const currentTrip = trips.find(t => String(t.id) === String(activeTripId)) || null;
+
+  // Trip events (3 args now; no trip-name-summary anymore)
+  renderTripEvents(
+    currentTrip,
+    els["trip-events-list"],
+    els["trip-events-summary"]
+  );
+  
+  renderAllTripsDetails(
+    trips,
+    els["trip-stats-container"], 
+    els["trip-pax-container"],
+    els["trip-details-empty"]
+  );
+
+  updateTripNewFieldVisibility();
+  syncAllTripsToggle();
+}
+
+// -- State Helpers --
+
+function hasTripChoice() {
+  const sel = els["trip-existing"].value;
+  const newName = els["trip-new-name"].value.trim();
+  if (sel && sel !== "__new__") return true;
+  if (!sel || sel === "__new__") return newName.length > 0;
+  return false;
+}
+
+function getCurrentTrip() {
+  let trip = trips.find(t => String(t.id) === String(activeTripId)) || null;
+  if (!trip) {
+    const newName = els["trip-new-name"].value.trim() || "New trip";
+    trip = {
+      id: Date.now(),
+      name: newName,
+      createdAt: new Date().toISOString(),
+      records: [],
+      hotels: []
+    };
+    trips.push(trip);
+    activeTripId = trip.id;
+    renderTripSelect(trips, activeTripId);
+  }
+  return trip;
+}
+
+// -- Validation --
+
+function validateFlightFormState() {
+  let ok = true;
+  const flightRaw = els["flight-number"].value.trim();
+  const dateVal = els["flight-date"].value;
+  
+  const selectedExisting = Array.from(els["pax-existing"].selectedOptions || []).map(o => o.value);
+  const newNames = els["pax-new"].value.trim().split(",").map(s => s.trim()).filter(Boolean);
+  const paxCount = normalizePassengerNames([...selectedExisting, ...newNames]).length;
+
+  els["manual-route-error"].textContent = "";
+
+  if (!hasTripChoice()) {
+    ok = false;
+    els["trip-error"].textContent = "Choose an existing trip or enter a new trip name.";
+  } else {
+    els["trip-error"].textContent = "";
+  }
+
+  if (!flightRaw) {
+    ok = false;
+    els["flight-error"].textContent = "Please enter a flight number.";
+  } else if (!isValidFlightNumber(flightRaw)) {
+    ok = false;
+    els["flight-error"].textContent = "Flight number looks invalid.";
+  } else {
+    els["flight-error"].textContent = "";
+  }
+
+  if (!dateVal) {
+    ok = false;
+    els["flight-date-error"].textContent = "Please enter the flight date.";
+  } else {
+    els["flight-date-error"].textContent = "";
+  }
+
+  if (paxCount === 0) {
+    ok = false;
+    els["pax-error"].textContent = "Select or add at least one passenger.";
+  } else {
+    els["pax-error"].textContent = "";
+  }
+
+  if (manualRouteMode) {
+    let manualOk = true;
+    if (!els["manual-dep-airport"].value.trim() || !els["manual-arr-airport"].value.trim()) manualOk = false;
+    if (!els["manual-dep-time"].value || !els["manual-arr-time"].value) manualOk = false;
+    if (!manualOk) {
+      ok = false;
+      els["manual-route-error"].textContent = "Please fill departure/arrival details.";
+    }
+  }
+
+  if (els.flightSubmitBtn) els.flightSubmitBtn.disabled = !ok;
+}
+
+function validateHotelFormState() {
+  let ok = true;
+  const existingVal = els["hotel-existing"].value;
+  const newName = els["hotel-name"].value.trim();
+  const pax = Number(els["hotel-pax"].value.trim() || "0");
+  const checkIn = els["hotel-checkin"].value;
+  const checkOut = els["hotel-checkout"].value;
+
+  if (!hasTripChoice()) {
+    ok = false;
+    els["trip-error"].textContent = "Choose a trip.";
+  } else {
+    els["trip-error"].textContent = "";
+  }
+
+  if ((!existingVal || existingVal === "__new__") && !newName) {
+    ok = false;
+    els["hotel-name-error"].textContent = "Enter a hotel name.";
+  } else if (existingVal && existingVal !== "__new__" && newName) {
+    ok = false;
+    els["hotel-name-error"].textContent = "Choose existing OR new, not both.";
+  } else {
+    els["hotel-name-error"].textContent = "";
+  }
+
+  if (!pax || pax < 1) {
+    ok = false;
+    els["hotel-pax-error"].textContent = "At least 1 guest.";
+  } else {
+    els["hotel-pax-error"].textContent = "";
+  }
+
+  if (!checkIn || !checkOut) {
+    ok = false;
+    els["hotel-dates-error"].textContent = "Enter dates.";
+  } else if (checkOut < checkIn) {
+    ok = false;
+    els["hotel-dates-error"].textContent = "Check-out must be after check-in.";
+  } else {
+    els["hotel-dates-error"].textContent = "";
+  }
+
+  if (els.hotelSubmitBtn) els.hotelSubmitBtn.disabled = !ok;
+}
+
+function updateAddFlightState() {
+  if (hasTripChoice()) {
+    els["add-flight-btn"].disabled = false;
+    els["trip-error"].textContent = "";
+  } else {
+    els["add-flight-btn"].disabled = true;
+    els["trip-error"].textContent = "Choose a trip first.";
+  }
+}
+function updateAddHotelState() {
+  if (hasTripChoice()) {
+    els["add-hotel-btn"].disabled = false;
+    els["trip-error"].textContent = "";
+  } else {
+    els["add-hotel-btn"].disabled = true;
+  }
+}
+
+// -- Event Listeners --
+
+function setupEventListeners() {
+  // Mobile toggle All Trips Statistics
+  if (els["toggle-alltrips-btn"]) {
+    els["toggle-alltrips-btn"].addEventListener("click", () => {
+      const card = document.querySelector(".card-trip-details");
+      if (!card) return;
+      card.classList.toggle("is-expanded");
+      syncAllTripsToggle();
+    });
+  }
+
+  els["trip-existing"].addEventListener("change", () => {
+    const val = els["trip-existing"].value;
+    if (val && val !== "__new__") {
+      activeTripId = val;
+      els["trip-new-name"].value = "";
+    } else {
+      activeTripId = null;
+    }
+    updateTripNewFieldVisibility();
+    renderAll();
+    updateAddFlightState();
+    updateAddHotelState();
+  });
+
+  els["trip-new-name"].addEventListener("input", () => {
+    if (els["trip-existing"].value !== "__new__") {
+      els["trip-existing"].value = "__new__";
+      activeTripId = null;
+      updateTripNewFieldVisibility();
+
+      renderTripEvents(null, els["trip-events-list"], els["trip-events-summary"]);
+
+      renderAllTripsDetails(
+        trips,
+        els["trip-stats-container"], 
+        els["trip-pax-container"],
+        els["trip-details-empty"]
+      );
+    }
+    updateAddFlightState();
+    updateAddHotelState();
+  });
+
+  // UI Overlays
+  els["add-flight-btn"].addEventListener("click", () => {
+    manualRouteMode = false;
+    els["manual-route-section"].classList.add("hidden");
+    els["flight-overlay"].classList.remove("hidden");
+    validateFlightFormState();
+  });
+  
+  els["close-flight-overlay"].addEventListener("click", () => els["flight-overlay"].classList.add("hidden"));
+  els["cancel-flight-btn"].addEventListener("click", () => els["flight-overlay"].classList.add("hidden"));
+
+  els["add-hotel-btn"].addEventListener("click", () => {
+    els["hotel-overlay"].classList.remove("hidden");
+    validateHotelFormState();
+  });
+
+  els["close-hotel-overlay"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
+  els["cancel-hotel-btn"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
+
+  // Form Validations
+  ["flight-number", "flight-date", "pax-new", "manual-airline", "manual-dep-airport", "manual-arr-airport"]
+    .forEach(id => els[id]?.addEventListener("input", validateFlightFormState));
+  els["pax-existing"].addEventListener("change", validateFlightFormState);
+  
+  ["hotel-existing", "hotel-name", "hotel-pax", "hotel-id"]
+    .forEach(id => els[id]?.addEventListener("input", validateHotelFormState));
+  ["hotel-checkin", "hotel-checkout"].forEach(id => els[id]?.addEventListener("change", validateHotelFormState));
+
+  // Flight Submit
+  els["flight-form"].addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (els.flightSubmitBtn.disabled) return;
+
+    const flightNumberRaw = els["flight-number"].value.trim();
+    const flightDate = els["flight-date"].value;
+    const pnrRaw = els["pnr"].value.trim();
+
+    const selectedPax = Array.from(els["pax-existing"].selectedOptions).map(o => o.value);
+    const newPax = els["pax-new"].value.split(",").map(s => s.trim()).filter(Boolean);
+    const paxNames = normalizePassengerNames([...selectedPax, ...newPax]);
+
+    const currentTrip = getCurrentTrip();
+    let route;
+
+    if (manualRouteMode) {
+      route = {
+        flightNumber: normalizeFlightNumber(els["manual-flight-number"].value || flightNumberRaw),
+        airline: els["manual-airline"].value.trim(),
+        departure: {
+          airport: els["manual-dep-airport"].value.trim(),
+          iata: els["manual-dep-iata"].value.trim().toUpperCase(),
+          scheduled: `${flightDate}T${els["manual-dep-time"].value}:00`
+        },
+        arrival: {
+          airport: els["manual-arr-airport"].value.trim(),
+          iata: els["manual-arr-iata"].value.trim().toUpperCase(),
+          scheduled: `${flightDate}T${els["manual-arr-time"].value}:00`
+        }
+      };
+    } else {
+      try {
+        const cached = findCachedRoute(trips, flightNumberRaw, flightDate);
+        if (cached && confirm("Found saved route. Use it?")) {
+          route = cloneRouteWithDate(cached, flightDate);
+        } else {
+          els["output"].textContent = "Fetching...";
+          const baseRoute = await fetchRoute(flightNumberRaw);
+          route = cloneRouteWithDate(baseRoute, flightDate);
+        }
+      } catch (err) {
+        if (confirm(`API Error: ${err.message}. Enter manually?`)) {
+          manualRouteMode = true;
+          els["manual-route-section"].classList.remove("hidden");
+          validateFlightFormState();
+          return;
+        }
+        return;
+      }
+    }
+
+    currentTrip.records.push({
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
+      flightDate,
+      pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
+      paxNames,
+      route
+    });
+
+    saveTrips(trips);
+    renderAll();
+    els["flight-overlay"].classList.add("hidden");
+    
+    els["flight-form"].reset();
+    els["output"].textContent = "{}";
+  });
+
+  // Hotel Submit
+  els["hotel-form"].addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (els.hotelSubmitBtn.disabled) return;
+
+    const currentTrip = getCurrentTrip();
+    let hotelName = els["hotel-name"].value.trim();
+    if (!hotelName && els["hotel-existing"].value !== "__new__") {
+      hotelName = els["hotel-existing"].value;
+    }
+
+    currentTrip.hotels.push({
+      id: els["hotel-id"].value.trim() || generateHotelId(),
+      createdAt: new Date().toISOString(),
+      hotelName,
+      checkInDate: els["hotel-checkin"].value,
+      checkOutDate: els["hotel-checkout"].value,
+      paxCount: Number(els["hotel-pax"].value),
+      paymentType: els["hotel-payment"].value
+    });
+
+    saveTrips(trips);
+    renderAll();
+    els["hotel-overlay"].classList.add("hidden");
+    els["hotel-form"].reset();
+  });
+
+  // Export/Import
+  els["download-json"].addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(trips, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "trips.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  els["import-json"].addEventListener("click", () => els["import-json-file"].click());
+  els["import-json-file"].addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        if (Array.isArray(parsed)) {
+          trips = parsed;
+          saveTrips(trips);
+          activeTripId = trips[0]?.id || null;
+          renderAll();
+          alert("Imported!");
+        }
+      } catch(err) { alert("Invalid JSON"); }
+    };
+    reader.readAsText(file);
+  });
+
+  els["clear-json"].addEventListener("click", () => {
+    if(confirm("Delete all data?")) {
+      trips = [];
+      activeTripId = null;
+      saveTrips(trips);
+      renderAll();
+    }
+  });
+}
+
+// Start
+document.addEventListener("DOMContentLoaded", init);

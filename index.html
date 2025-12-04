@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Flight Log</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="topbar-icon">✈︎</div>
+        <div class="topbar-text">
+          <div class="topbar-title">Flight Log</div>
+          <div class="topbar-subtitle">
+            Personal travel diary – trips, flights, hotels &amp; PNRs.
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="api-key-status" class="api-status-text">
+          Checking API key…
+        </span>
+        <div class="topbar-actions">
+          <button id="import-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">⬆︎</span>
+            <span>Import</span>
+          </button>
+          <button id="download-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">⬇︎</span>
+            <span>Download</span>
+          </button>
+          <button id="clear-json" class="btn btn-ghost btn-xs">
+            <span class="btn-icon">🗑</span>
+            <span>Clear All</span>
+          </button>
+        </div>
+        <input id="import-json-file" type="file" accept="application/json" style="display:none;" />
+      </div>
+    </header>
+
+    <!-- Main layout -->
+    <main class="main-content layout-columns">
+      <!-- COLUMN 1: Control Center Card -->
+      <div class="card-trip-container">
+        <div class="card card-trip">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Control Center</div>
+            </div>
+          </div>
+
+          <!-- Selection Row -->
+          <div id="trip-fields" class="field-group">
+            <div id="trip-existing-field" class="field">
+              <label for="trip-existing">Select Trip</label>
+              <select id="trip-existing">
+                <option value="__new__">➕ Create New Trip</option>
+              </select>
+            </div>
+
+            <div id="trip-new-field" class="field">
+              <label for="trip-new-name">New Trip Name</label>
+              <input
+                id="trip-new-name"
+                type="text"
+                placeholder="e.g. Japan 2025"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div id="trip-error" class="field-error" aria-live="polite"></div>
+
+          <!-- Action Buttons -->
+          <div class="control-grid">
+            <button id="add-flight-btn" class="btn btn-primary" disabled>
+              <span class="btn-icon">✈︎</span> Add Flight
+            </button>
+            <button id="add-hotel-btn" class="btn btn-primary" disabled>
+              <span class="btn-icon">🛏</span> Add Hotel
+            </button>
+          </div>
+
+          <!-- Summary Footer -->
+          <div class="summary-bar">
+            <span id="trip-events-summary">Select a trip to begin</span>
+          </div>
+        </div>
+        
+        <!-- Mobile toggle for All Trips Statistics -->
+        <button
+          id="toggle-alltrips-btn"
+          class="btn btn-primary stats-toggle-btn"
+          aria-expanded="false"
+          type="button"
+        >
+          Show all trips statistics
+        </button>
+
+        <!-- NEW CARD: Trip Statistics and Passenger List -->
+        <div class="card card-trip-details">
+          <div class="card-title">All trips statistics</div>
+          <div id="trip-stats-container" class="trip-stats-grid">
+            <!-- Stats will be rendered here -->
+          </div>
+          <div id="trip-pax-container">
+            <!-- Passengers will be rendered here -->
+          </div>
+          <div id="trip-details-empty" class="tiles-empty">
+           Add flights or hotels to start building your travel history.
+          </div>
+        </div>
+        
+      </div>
+
+      <!-- COLUMN 2: Event Stream -->
+      <div class="event-stream-container">
+        <div class="panel-body">
+          <div id="trip-events-list" class="tiles-grid">
+            <div class="tiles-empty">Select a trip to start adding flights and hotels.</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Flight Overlay -->
+    <div id="flight-overlay" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-backdrop"></div>
+      <section class="card card-flight overlay-card" role="dialog" aria-modal="true">
+        <button type="button" id="close-flight-overlay" class="overlay-close-btn">×</button>
+        <div class="card-header">
+          <div>
+            <div class="card-title">Add Flight</div>
+            <div class="card-subtitle">Enter flight details</div>
+          </div>
+        </div>
+        <form id="flight-form">
+          <div class="field-group">
+            <div class="field">
+              <label for="flight-number">Flight Number</label>
+              <input id="flight-number" type="text" placeholder="LH438" autocomplete="off" required style="text-transform: uppercase;" />
+              <div id="flight-error" class="field-error" aria-live="polite"></div>
+            </div>
+            <div class="field">
+              <label for="flight-date">Date</label>
+              <input id="flight-date" type="date" required />
+              <div id="flight-date-error" class="field-error" aria-live="polite"></div>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field">
+              <label for="pax-existing">Passengers</label>
+              <select id="pax-existing" multiple style="height: 80px;"></select>
+            </div>
+            <div class="field">
+              <label for="pax-new">New Passenger</label>
+              <input id="pax-new" type="text" placeholder="Name" autocomplete="off" />
+            </div>
+          </div>
+          <div id="pax-error" class="field-error" aria-live="polite"></div>
+          
+          <div class="field">
+            <label for="pnr">PNR / Booking Ref</label>
+            <input id="pnr" type="text" placeholder="ABC123" autocomplete="off" style="text-transform: uppercase;" />
+          </div>
+
+          <!-- Manual Route -->
+          <div id="manual-route-section" class="manual-route hidden">
+            <div class="manual-route-header">Manual Entry</div>
+            <div class="field-group">
+              <div class="field"><label>Airline</label><input id="manual-airline" type="text" /></div>
+              <div class="field"><label>Flight #</label><input id="manual-flight-number" type="text" /></div>
+            </div>
+            <div class="field-group">
+              <div class="field"><label>Dep Airport</label><input id="manual-dep-airport" type="text" /></div>
+              <div class="field"><label>IATA</label><input id="manual-dep-iata" type="text" placeholder="LHR" maxlength="3" /></div>
+            </div>
+            <div class="field-group">
+              <div class="field"><label>Dep Time</label><input id="manual-dep-time" type="time" /></div>
+              <div class="field"><label>Arr Time</label><input id="manual-arr-time" type="time" /></div>
+            </div>
+            <div class="field-group">
+              <div class="field"><label>Arr Airport</label><input id="manual-arr-airport" type="text" /></div>
+              <div class="field"><label>IATA</label><input id="manual-arr-iata" type="text" placeholder="JFK" maxlength="3" /></div>
+            </div>
+            <div id="manual-route-error" class="field-error" aria-live="polite"></div>
+          </div>
+
+          <div class="secondary-card" style="margin-top: 10px; opacity: 0.8;">
+            <pre id="output" class="json-block" style="max-height: 100px;">{}</pre>
+          </div>
+
+          <div class="button-row overlay-actions">
+            <button type="button" class="btn btn-ghost" id="cancel-flight-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled>
+              <span class="btn-icon">➕</span><span>Save flight</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <!-- Hotel Overlay -->
+    <div id="hotel-overlay" class="overlay hidden" aria-hidden="true">
+      <div class="overlay-backdrop"></div>
+      <section class="card card-hotel overlay-card" role="dialog" aria-modal="true">
+        <button type="button" id="close-hotel-overlay" class="overlay-close-btn">×</button>
+        <div class="card-header">
+          <div><div class="card-title">Add Hotel</div></div>
+        </div>
+        <form id="hotel-form">
+          <div class="field-group">
+            <div class="field">
+              <label for="hotel-existing">Select Hotel</label>
+              <select id="hotel-existing">
+                <option value="__new__">➕ Enter New Hotel</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="hotel-name">Or New Name</label>
+              <input id="hotel-name" type="text" placeholder="Hilton..." />
+            </div>
+          </div>
+          <div id="hotel-name-error" class="field-error" aria-live="polite"></div>
+          
+          <div class="field-group">
+            <div class="field">
+              <label for="hotel-pax">Guests</label>
+              <input id="hotel-pax" type="number" inputmode="numeric" min="1" placeholder="2" />
+              <div id="hotel-pax-error" class="field-error"></div>
+            </div>
+            <div class="field">
+              <label>Dates</label>
+              <div class="field-group" style="grid-template-columns: 1fr 1fr; gap:6px;">
+                <input id="hotel-checkin" type="date" />
+                <input id="hotel-checkout" type="date" />
+              </div>
+              <div id="hotel-dates-error" class="field-error"></div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <div class="field">
+              <label for="hotel-payment">Payment</label>
+              <select id="hotel-payment">
+                <option value="prepaid">Already paid</option>
+                <option value="pay_at_hotel">Pay at hotel</option>
+              </select>
+              <small>Whether the room is already paid or due at the property.</small>
+            </div>
+            <div class="field">
+              <label for="hotel-id">Booking / confirmation ID</label>
+              <input
+                id="hotel-id"
+                type="text"
+                placeholder="ABC123 or leave empty"
+                autocomplete="off"
+              />
+              <small>If left empty, an ID will be generated.</small>
+            </div>
+          </div>
+
+          <div class="button-row overlay-actions">
+            <button type="button" class="btn btn-ghost" id="cancel-hotel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" disabled>
+              <span class="btn-icon">➕</span><span>Save hotel</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- Note: type="module" is required for the modular JS to work -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
