@@ -97,7 +97,9 @@ function syncAllTripsToggle() {
   const card = document.querySelector(".card-trip-details");
   if (!btn || !card) return;
 
-  if (!isMobileView()) {
+  const mobile = isMobileView();
+
+  if (!mobile) {
     // Desktop: always show card, hide button
     card.classList.remove("is-expanded");
     card.style.display = "";
@@ -113,6 +115,7 @@ function syncAllTripsToggle() {
   btn.textContent = expanded
     ? "Hide all trips statistics"
     : "Show all trips statistics";
+  card.style.display = expanded ? "block" : "none";
 }
 
 // ------------------------------------------------------------------
