@@ -182,7 +182,9 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
   // Render Days
   for (const day of days) {
-    const mobileView = window.matchMedia && window.matchMedia("(max-width: 720px)").matches;
+    const mobileView =
+      (window.matchMedia && window.matchMedia("(max-width: 720px)").matches) ||
+      window.innerWidth <= 720;
     const dateLabel = day.date ? formatFriendlyDate(day.date) : "Undated";
     const flightsCount = day.flights.reduce(
       (acc, fg) => acc + (Array.isArray(fg.records) ? fg.records.length : 0), 0
@@ -246,12 +248,14 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           ? (d.iata || d.icao || d.airport || "—")
           : (d.airport || d.iata || d.icao || "—");
         const depCode = d.iata || d.icao || "";
+        const depLabel = mobileView ? (depCode || depCity) : depCity;
         const depTime = extractTime(d.scheduled);
 
         const arrCity = mobileView
           ? (a.iata || a.icao || a.airport || "—")
           : (a.airport || a.iata || a.icao || "—");
         const arrCode = a.iata || a.icao || "";
+        const arrLabel = mobileView ? (arrCode || arrCity) : arrCity;
         const arrTime = extractTime(a.scheduled);
 
         const headerRight = [airlineName, fn].filter(Boolean).join(" ");
@@ -261,12 +265,12 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
             <div class="segment-header-row">
               <span class="segment-label">${legLabel}</span>
               <span class="segment-flight-code">
-                ${headerRight || "Flight"}${!mobileView && pnrDisplay && pnrDisplay !== "—" ? ` • PNR ${pnrDisplay}` : ""}
+                ${headerRight || "Flight"}${!mobileView && pnrDisplay && pnrDisplay !== "—" ? ` <span class="pnr-text">• PNR ${pnrDisplay}</span>` : ""}
               </span>
             </div>
             <div class="segment-main-row">
               <div class="segment-side">
-                <div class="segment-city">${depCity}</div>
+                <div class="segment-city">${depLabel}</div>
                 <div class="segment-code-time">
                   <span class="segment-code">${depCode}</span>
                   <span class="segment-time">${depTime || ""}</span>
@@ -276,7 +280,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
                   <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
                 </div>
               <div class="segment-side segment-side-right">
-                <div class="segment-city">${arrCity}</div>
+                <div class="segment-city">${arrLabel}</div>
                 <div class="segment-code-time">
                   <span class="segment-code">${arrCode}</span>
                   <span class="segment-time">${arrTime || ""}</span>

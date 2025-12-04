@@ -24,6 +24,7 @@ import {
 let trips = [];
 let activeTripId = null;
 let topbarMenuOpen = false;
+let lastIsMobile = null;
 
 // -- DOM Elements (cached for use in event listeners) --
 const els = {};
@@ -119,6 +120,16 @@ function syncAllTripsToggle() {
     ? "Hide all trips statistics"
     : "Show all trips statistics";
   card.style.display = expanded ? "block" : "none";
+}
+
+function handleResponsiveResize() {
+  const nowMobile = isMobileView();
+  if (lastIsMobile === null) lastIsMobile = nowMobile;
+  if (nowMobile !== lastIsMobile) {
+    lastIsMobile = nowMobile;
+    renderAll();
+  }
+  syncAllTripsToggle();
 }
 
 function setStatusText(id, text) {
@@ -430,6 +441,7 @@ async function init() {
   cacheElements();
   trips = loadTrips();
   activeTripId = trips.length ? trips[0].id : null;
+  lastIsMobile = isMobileView();
 
   renderAll();
   updateTripNewFieldVisibility();
@@ -443,7 +455,7 @@ async function init() {
   updateAddHotelState();
   setupEventListeners();
 
-  window.addEventListener("resize", syncAllTripsToggle);
+  window.addEventListener("resize", handleResponsiveResize);
 }
 
 function renderAll() {

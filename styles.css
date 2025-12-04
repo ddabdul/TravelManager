@@ -185,6 +185,12 @@ body {
   border-color: var(--accent);
 }
 
+@media (max-width: 720px) {
+  .pnr-text {
+    display: none;
+  }
+}
+
 /* Mobile topbar tweaks */
 @media (max-width: 640px) {
   .topbar {
