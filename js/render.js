@@ -248,6 +248,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           ? (d.iata || d.icao || d.airport || "—")
           : (d.airport || d.iata || d.icao || "—");
         const depCode = d.iata || d.icao || "";
+        const depCodeDisplay = mobileView ? "" : depCode;
         const depLabel = mobileView ? (depCode || depCity) : depCity;
         const depTime = extractTime(d.scheduled);
 
@@ -255,6 +256,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           ? (a.iata || a.icao || a.airport || "—")
           : (a.airport || a.iata || a.icao || "—");
         const arrCode = a.iata || a.icao || "";
+        const arrCodeDisplay = mobileView ? "" : arrCode;
         const arrLabel = mobileView ? (arrCode || arrCity) : arrCity;
         const arrTime = extractTime(a.scheduled);
 
@@ -272,7 +274,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
               <div class="segment-side">
                 <div class="segment-city">${depLabel}</div>
                 <div class="segment-code-time">
-                  <span class="segment-code">${depCode}</span>
+                  <span class="segment-code">${depCodeDisplay}</span>
                   <span class="segment-time">${depTime || ""}</span>
                 </div>
               </div>
@@ -282,7 +284,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
               <div class="segment-side segment-side-right">
                 <div class="segment-city">${arrLabel}</div>
                 <div class="segment-code-time">
-                  <span class="segment-code">${arrCode}</span>
+                  <span class="segment-code">${arrCodeDisplay}</span>
                   <span class="segment-time">${arrTime || ""}</span>
                 </div>
               </div>
