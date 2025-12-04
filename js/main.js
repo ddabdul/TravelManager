@@ -42,7 +42,7 @@ function cacheElements() {
     "hotel-checkin", "hotel-checkout", "hotel-payment", "hotel-id",
     "hotel-name-error", "hotel-pax-error", "hotel-dates-error",
     "import-json", "import-json-file", "download-json", "clear-json",
-    "api-key-status",
+    "api-key-status", "storage-usage",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
@@ -116,6 +116,21 @@ function syncAllTripsToggle() {
     ? "Hide all trips statistics"
     : "Show all trips statistics";
   card.style.display = expanded ? "block" : "none";
+}
+
+// Display current storage usage of the trips payload
+function updateStorageUsage() {
+  const target = els["storage-usage"];
+  if (!target) return;
+  try {
+    const json = JSON.stringify(trips);
+    const bytes = new TextEncoder().encode(json).length;
+    const kb = bytes / 1024;
+    const label = kb >= 1024 ? `${(kb / 1024).toFixed(2)} MB` : `${kb.toFixed(1)} KB`;
+    target.textContent = `Storage: ${label}`;
+  } catch {
+    target.textContent = "Storage: n/a";
+  }
 }
 
 // ------------------------------------------------------------------
@@ -433,6 +448,7 @@ function renderAll() {
 
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
+  updateStorageUsage();
 }
 
 // -- State Helpers --
