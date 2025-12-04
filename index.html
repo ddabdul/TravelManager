@@ -26,19 +26,28 @@
         <span id="storage-usage" class="api-status-text">
           Storage: --
         </span>
-        <div class="topbar-actions">
-          <button id="import-json" class="btn btn-ghost btn-xs">
-            <span class="btn-icon">⬆︎</span>
-            <span>Import</span>
+        <div class="topbar-menu">
+          <button
+            id="topbar-menu-btn"
+            class="btn btn-ghost btn-xs topbar-menu-btn"
+            type="button"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            <span class="btn-icon">≡</span>
+            <span>Menu</span>
           </button>
-          <button id="download-json" class="btn btn-ghost btn-xs">
-            <span class="btn-icon">⬇︎</span>
-            <span>Download</span>
-          </button>
-          <button id="clear-json" class="btn btn-ghost btn-xs">
-            <span class="btn-icon">🗑</span>
-            <span>Clear All</span>
-          </button>
+          <div id="topbar-menu-panel" class="menu-panel hidden" role="menu">
+            <button id="import-json" class="menu-item" role="menuitem">
+              Import
+            </button>
+            <button id="download-json" class="menu-item" role="menuitem">
+              Download
+            </button>
+            <button id="clear-json" class="menu-item" role="menuitem">
+              Clear All
+            </button>
+          </div>
         </div>
         <input id="import-json-file" type="file" accept="application/json" style="display:none;" />
       </div>

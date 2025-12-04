@@ -23,6 +23,7 @@ import {
 // -- Globals --
 let trips = [];
 let activeTripId = null;
+let topbarMenuOpen = false;
 
 // -- DOM Elements (cached for use in event listeners) --
 const els = {};
@@ -43,6 +44,7 @@ function cacheElements() {
     "hotel-name-error", "hotel-pax-error", "hotel-dates-error",
     "import-json", "import-json-file", "download-json", "clear-json",
     "api-key-status", "storage-usage",
+    "topbar-menu-btn", "topbar-menu-panel",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
@@ -116,6 +118,15 @@ function syncAllTripsToggle() {
     ? "Hide all trips statistics"
     : "Show all trips statistics";
   card.style.display = expanded ? "block" : "none";
+}
+
+function setTopbarMenuOpen(open) {
+  const btn = els["topbar-menu-btn"];
+  const panel = els["topbar-menu-panel"];
+  topbarMenuOpen = !!open;
+  if (!btn || !panel) return;
+  panel.classList.toggle("hidden", !open);
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 // Display current storage usage of the trips payload
@@ -602,6 +613,28 @@ function updateAddHotelState() {
 // -- Event Listeners --
 
 function setupEventListeners() {
+  // Header hamburger menu
+  if (els["topbar-menu-btn"] && els["topbar-menu-panel"]) {
+    els["topbar-menu-btn"].addEventListener("click", (e) => {
+      e.stopPropagation();
+      setTopbarMenuOpen(!topbarMenuOpen);
+    });
+    els["topbar-menu-panel"].addEventListener("click", (e) => {
+      if (e.target.closest(".menu-item")) setTopbarMenuOpen(false);
+    });
+    document.addEventListener("click", (e) => {
+      if (!topbarMenuOpen) return;
+      const panel = els["topbar-menu-panel"];
+      const btn = els["topbar-menu-btn"];
+      if (!panel || !btn) return;
+      if (panel.contains(e.target) || btn.contains(e.target)) return;
+      setTopbarMenuOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && topbarMenuOpen) setTopbarMenuOpen(false);
+    });
+  }
+
   // Mobile toggle All Trips Statistics
   if (els["toggle-alltrips-btn"]) {
     els["toggle-alltrips-btn"].addEventListener("click", () => {
