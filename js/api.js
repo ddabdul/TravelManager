@@ -7,6 +7,12 @@ import { normalizeFlightNumber } from "./utils.js";
 
 export async function loadApiKey() {
   try {
+    const stored = (localStorage.getItem("apiKeyOverride") || "").trim();
+    if (stored) {
+      apiState.key = stored;
+      return { success: true, message: "API key loaded from local storage." };
+    }
+
     const res = await fetch("config.json", { cache: "no-store" });
     if (!res.ok) {
       return { success: false, message: "config.json not found (status " + res.status + ")." };

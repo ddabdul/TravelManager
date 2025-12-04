@@ -44,6 +44,9 @@
               <div id="api-key-status-menu" class="menu-status-text">Checking API key…</div>
               <div id="storage-usage-menu" class="menu-status-text">Storage: --</div>
             </div>
+            <button id="config-upload-btn" class="menu-item hidden" role="menuitem">
+              Upload config.json
+            </button>
             <button id="import-json" class="menu-item" role="menuitem">
               Import
             </button>
@@ -55,6 +58,7 @@
             </button>
           </div>
         </div>
+        <input id="config-upload-file" type="file" accept="application/json" style="display:none;" />
         <input id="import-json-file" type="file" accept="application/json" style="display:none;" />
       </div>
     </header>

@@ -47,6 +47,7 @@ function cacheElements() {
     "api-key-status", "storage-usage",
     "api-key-status-menu", "storage-usage-menu",
     "topbar-menu-btn", "topbar-menu-panel",
+    "config-upload-btn", "config-upload-file",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
@@ -137,6 +138,12 @@ function setStatusText(id, text) {
   if (el) el.textContent = text;
   const menuEl = els[`${id}-menu`];
   if (menuEl) menuEl.textContent = text;
+}
+
+function setConfigUploadVisibility(show) {
+  const btn = els["config-upload-btn"];
+  if (!btn) return;
+  btn.classList.toggle("hidden", !show);
 }
 
 function setTopbarMenuOpen(open) {
@@ -446,10 +453,10 @@ async function init() {
   renderAll();
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
-  
   setStatusText("api-key-status", "Loading configuration...");
   const keyStatus = await loadApiKey();
   setStatusText("api-key-status", keyStatus.message);
+  setConfigUploadVisibility(!keyStatus.success);
 
   updateAddFlightState();
   updateAddHotelState();
@@ -655,6 +662,35 @@ function setupEventListeners() {
     });
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && topbarMenuOpen) setTopbarMenuOpen(false);
+    });
+  }
+
+  // Config upload (manual API key)
+  if (els["config-upload-btn"] && els["config-upload-file"]) {
+    els["config-upload-btn"].addEventListener("click", (e) => {
+      e.stopPropagation();
+      els["config-upload-file"].click();
+    });
+    els["config-upload-file"].addEventListener("change", async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        const key = ((json && (json.AVIATIONSTACK_API_KEY || json.apiKey)) || "").trim();
+        if (!key) {
+          alert("No API key found in file.");
+          return;
+        }
+        localStorage.setItem("apiKeyOverride", key);
+        setStatusText("api-key-status", "API key loaded from upload.");
+        setConfigUploadVisibility(false);
+      } catch (err) {
+        console.error(err);
+        alert("Could not read config.json");
+      } finally {
+        e.target.value = "";
+      }
     });
   }
 
