@@ -18,12 +18,14 @@
         </div>
       </div>
       <div class="topbar-right">
-        <span id="api-key-status" class="api-status-text">
-          Checking API key…
-        </span>
-        <span id="storage-usage" class="api-status-text">
-          Storage: --
-        </span>
+        <div class="topbar-status">
+          <span id="api-key-status" class="api-status-text">
+            Checking API key…
+          </span>
+          <span id="storage-usage" class="api-status-text">
+            Storage: --
+          </span>
+        </div>
         <div class="topbar-menu">
           <button
             id="topbar-menu-btn"
@@ -36,6 +38,10 @@
             <span>Menu</span>
           </button>
           <div id="topbar-menu-panel" class="menu-panel hidden" role="menu">
+            <div class="menu-status">
+              <div id="api-key-status-menu" class="menu-status-text">Checking API key…</div>
+              <div id="storage-usage-menu" class="menu-status-text">Storage: --</div>
+            </div>
             <button id="import-json" class="menu-item" role="menuitem">
               Import
             </button>

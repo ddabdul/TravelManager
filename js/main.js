@@ -44,6 +44,7 @@ function cacheElements() {
     "hotel-name-error", "hotel-pax-error", "hotel-dates-error",
     "import-json", "import-json-file", "download-json", "clear-json",
     "api-key-status", "storage-usage",
+    "api-key-status-menu", "storage-usage-menu",
     "topbar-menu-btn", "topbar-menu-panel",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
@@ -120,6 +121,13 @@ function syncAllTripsToggle() {
   card.style.display = expanded ? "block" : "none";
 }
 
+function setStatusText(id, text) {
+  const el = els[id];
+  if (el) el.textContent = text;
+  const menuEl = els[`${id}-menu`];
+  if (menuEl) menuEl.textContent = text;
+}
+
 function setTopbarMenuOpen(open) {
   const btn = els["topbar-menu-btn"];
   const panel = els["topbar-menu-panel"];
@@ -132,15 +140,18 @@ function setTopbarMenuOpen(open) {
 // Display current storage usage of the trips payload
 function updateStorageUsage() {
   const target = els["storage-usage"];
-  if (!target) return;
+  const menuTarget = els["storage-usage-menu"];
   try {
     const json = JSON.stringify(trips);
     const bytes = new TextEncoder().encode(json).length;
     const kb = bytes / 1024;
     const label = kb >= 1024 ? `${(kb / 1024).toFixed(2)} MB` : `${kb.toFixed(1)} KB`;
-    target.textContent = `Storage: ${label}`;
+    const text = `Storage: ${label}`;
+    if (target) target.textContent = text;
+    if (menuTarget) menuTarget.textContent = text;
   } catch {
-    target.textContent = "Storage: n/a";
+    if (target) target.textContent = "Storage: n/a";
+    if (menuTarget) menuTarget.textContent = "Storage: n/a";
   }
 }
 
@@ -424,9 +435,9 @@ async function init() {
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
   
-  if (els["api-key-status"]) els["api-key-status"].textContent = "Loading configuration...";
+  setStatusText("api-key-status", "Loading configuration...");
   const keyStatus = await loadApiKey();
-  if (els["api-key-status"]) els["api-key-status"].textContent = keyStatus.message;
+  setStatusText("api-key-status", keyStatus.message);
 
   updateAddFlightState();
   updateAddHotelState();

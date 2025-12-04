@@ -110,6 +110,13 @@ body {
   gap: 14px;
 }
 
+.topbar-status {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .topbar-menu {
   position: relative;
 }
@@ -146,6 +153,19 @@ body {
   color: var(--text-main);
 }
 
+.menu-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.menu-status-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 @media (prefers-color-scheme: dark) {
   .menu-panel {
     background: #1c1c1e;
@@ -155,6 +175,9 @@ body {
     background: #2c2c2e;
     border-color: rgba(255,255,255,0.08);
     color: var(--text-main);
+  }
+  .menu-status {
+    border-bottom-color: rgba(255,255,255,0.08);
   }
 }
 
@@ -176,6 +199,9 @@ body {
     width: 100%;
     justify-content: space-between;
     flex-wrap: wrap;
+  }
+  .topbar-status {
+    display: none;
   }
   .topbar-menu {
     position: absolute;
