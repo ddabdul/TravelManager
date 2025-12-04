@@ -1006,10 +1006,11 @@ small {
   inset: 0;
   z-index: 40;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 20px 12px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .overlay.hidden {
@@ -1031,6 +1032,7 @@ small {
   z-index: 41;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .overlay-close-btn {
