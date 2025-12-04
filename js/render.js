@@ -182,6 +182,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
   // Render Days
   for (const day of days) {
+    const mobileView = window.matchMedia && window.matchMedia("(max-width: 720px)").matches;
     const dateLabel = day.date ? formatFriendlyDate(day.date) : "Undated";
     const flightsCount = day.flights.reduce(
       (acc, fg) => acc + (Array.isArray(fg.records) ? fg.records.length : 0), 0
@@ -241,11 +242,15 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
         const fn = (r.flightNumber || "").toString();
         const legLabel = i === 0 ? "Departure" : "Connecting flight";
 
-        const depCity = d.airport || d.iata || d.icao || "—";
+        const depCity = mobileView
+          ? (d.iata || d.icao || d.airport || "—")
+          : (d.airport || d.iata || d.icao || "—");
         const depCode = d.iata || d.icao || "";
         const depTime = extractTime(d.scheduled);
 
-        const arrCity = a.airport || a.iata || a.icao || "—";
+        const arrCity = mobileView
+          ? (a.iata || a.icao || a.airport || "—")
+          : (a.airport || a.iata || a.icao || "—");
         const arrCode = a.iata || a.icao || "";
         const arrTime = extractTime(a.scheduled);
 
@@ -256,7 +261,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
             <div class="segment-header-row">
               <span class="segment-label">${legLabel}</span>
               <span class="segment-flight-code">
-                ${headerRight || "Flight"}${pnrDisplay && pnrDisplay !== "—" ? ` • PNR ${pnrDisplay}` : ""}
+                ${headerRight || "Flight"}${!mobileView && pnrDisplay && pnrDisplay !== "—" ? ` • PNR ${pnrDisplay}` : ""}
               </span>
             </div>
             <div class="segment-main-row">
@@ -311,7 +316,6 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       const nights = computeNights(h.checkInDate, h.checkOutDate);
       const nightsLabel = nights != null ? `${nights} night${nights === 1 ? "" : "s"}` : "";
       const pax = h.paxCount || 1;
-      const bookingId = h.id || "—";
       const paymentText = h.paymentType === "prepaid" ? "Already paid" : "Pay at hotel";
 
       segmentsHtml += `
@@ -330,7 +334,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           </div>
           <div class="segment-layover-text">
             <span class="sf-icon sf-icon-key" aria-hidden="true">🔑</span>
-            <span>Booking ${bookingId} • ${pax} guest${pax === 1 ? "" : "s"} • ${paymentText}</span>
+            <span>${pax} guest${pax === 1 ? "" : "s"} • ${paymentText}</span>
           </div>
         </div>
       `;
