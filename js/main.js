@@ -144,7 +144,7 @@ function setStatusText(id, text) {
 function setConfigUploadVisibility(show) {
   const btn = els["config-upload-btn"];
   if (!btn) return;
-  btn.classList.toggle("hidden", !show);
+  btn.classList.remove("hidden");
 }
 
 function setTopbarMenuOpen(open) {
