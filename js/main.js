@@ -12,7 +12,7 @@ import {
   cloneRouteWithDate, 
   generateHotelId 
 } from "./utils.js";
-import { findCachedRoute } from "./data.js";
+import { findCachedRoute, getAllPassengers } from "./data.js";
 import {
   renderTripsJson,
   renderTripSelect,
@@ -20,12 +20,15 @@ import {
   renderHotelSelect,
   renderTripEvents
 } from "./render.js";
+import { calculateDaysByCountry, getPassengerYears } from "./daycount.js";
 
 // -- Globals --
 let trips = [];
 let activeTripId = null;
 let topbarMenuOpen = false;
 let lastIsMobile = null;
+let currentScreen = "trips";
+let daycountState = { passenger: "", year: new Date().getFullYear() };
 
 // -- DOM Elements (cached for use in event listeners) --
 const els = {};
@@ -49,6 +52,12 @@ function cacheElements() {
     "api-key-status-menu", "storage-usage-menu",
     "topbar-menu-btn", "topbar-menu-panel",
     "config-upload-btn", "config-upload-file",
+    // Daycount view
+    "daycount-passenger", "daycount-year-list", "daycount-results", "daycount-empty",
+    // Screen switching
+    "screen-trips", "screen-daycount",
+    // Nav buttons
+    "nav-trips", "nav-daycount"
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
@@ -156,6 +165,109 @@ function setTopbarMenuOpen(open) {
   btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
+// Screen switching (trips / daycount)
+const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function switchScreen(screen) {
+  currentScreen = screen === "daycount" ? "daycount" : "trips";
+  document.querySelectorAll(".screen").forEach((s) => {
+    const active = s.id === `screen-${currentScreen}`;
+    s.classList.toggle("active-screen", active);
+    s.style.display = active ? "" : "none";
+  });
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.screen === currentScreen);
+  });
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.screen === currentScreen);
+  });
+  if (currentScreen === "daycount") {
+    renderDaycountView();
+  }
+}
+
+function renderDaycountView() {
+  const passSelect = els["daycount-passenger"];
+  const yearList = els["daycount-year-list"];
+  const resultsEl = els["daycount-results"];
+  const emptyEl = els["daycount-empty"];
+  if (!passSelect || !yearList || !resultsEl || !emptyEl) return;
+
+  const passengers = getAllPassengers(trips);
+  passSelect.innerHTML = '<option value="">Select passenger</option>';
+  passengers.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    if (p === daycountState.passenger) opt.selected = true;
+    passSelect.appendChild(opt);
+  });
+
+  if (!passengers.includes(daycountState.passenger)) {
+    daycountState.passenger = "";
+  }
+
+  if (!daycountState.passenger) {
+    emptyEl.textContent = passengers.length ? "Choose a passenger to view days by country." : "No passengers yet.";
+    emptyEl.classList.remove("hidden");
+    resultsEl.innerHTML = "";
+    yearList.innerHTML = "";
+    return;
+  }
+
+  const years = getPassengerYears(trips, daycountState.passenger);
+  if (!years.length) {
+    emptyEl.textContent = "No travel data for this passenger.";
+    emptyEl.classList.remove("hidden");
+    resultsEl.innerHTML = "";
+    yearList.innerHTML = "";
+    return;
+  }
+
+  if (!years.includes(daycountState.year)) {
+    daycountState.year = years[0];
+  }
+
+  yearList.innerHTML = years.map((y) => {
+    const active = y === daycountState.year ? "active" : "";
+    return `<button class="chip-button ${active}" data-year="${y}">${y}</button>`;
+  }).join("");
+
+  const { countries } = calculateDaysByCountry(trips, daycountState.passenger, daycountState.year);
+  const countryNames = Object.keys(countries || {}).sort();
+  if (!countryNames.length) {
+    emptyEl.textContent = "No travel data for this year.";
+    emptyEl.classList.remove("hidden");
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+  resultsEl.innerHTML = countryNames.map((country) => {
+    const months = countries[country] || [];
+    const total = months.reduce((a, b) => a + (b || 0), 0);
+    const monthCells = monthLabels.map((label, idx) => {
+      const days = months[idx] || 0;
+      const cls = days === 0 ? 'class="value zero"' : 'class="value"';
+      return `
+        <div class="daycount-month">
+          <div class="label">${label}</div>
+          <div ${cls}>${days}</div>
+        </div>`;
+    }).join("");
+    return `
+      <div class="daycount-country">
+        <div class="daycount-country-header">
+          <span>${country}</span>
+          <span class="daycount-country-total">${total} days</span>
+        </div>
+        <div class="daycount-months">
+          ${monthCells}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
 // Display current storage usage of the trips payload
 function updateStorageUsage() {
   const target = els["storage-usage"];
@@ -464,6 +576,7 @@ async function init() {
   setupEventListeners();
 
   window.addEventListener("resize", handleResponsiveResize);
+  switchScreen(currentScreen);
 }
 
 function renderAll() {
@@ -491,6 +604,7 @@ function renderAll() {
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
   updateStorageUsage();
+  renderDaycountView();
 }
 
 // -- State Helpers --
@@ -644,6 +758,14 @@ function updateAddHotelState() {
 // -- Event Listeners --
 
 function setupEventListeners() {
+  // Screen tabs (desktop) and bottom nav (mobile)
+  document.querySelectorAll(".tab-btn, .nav-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const targetScreen = e.currentTarget.dataset.screen;
+      switchScreen(targetScreen);
+    });
+  });
+
   // Header hamburger menu
   if (els["topbar-menu-btn"] && els["topbar-menu-panel"]) {
     els["topbar-menu-btn"].addEventListener("click", (e) => {
@@ -692,6 +814,27 @@ function setupEventListeners() {
         alert("Could not read config.json");
       } finally {
         e.target.value = "";
+      }
+    });
+  }
+
+  // Daycount selectors
+  if (els["daycount-passenger"]) {
+    els["daycount-passenger"].addEventListener("change", (e) => {
+      daycountState.passenger = e.target.value;
+      const years = getPassengerYears(trips, daycountState.passenger);
+      if (years.length) daycountState.year = years[0];
+      renderDaycountView();
+    });
+  }
+  if (els["daycount-year-list"]) {
+    els["daycount-year-list"].addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip-button");
+      if (!btn) return;
+      const year = Number(btn.dataset.year);
+      if (!isNaN(year)) {
+        daycountState.year = year;
+        renderDaycountView();
       }
     });
   }
