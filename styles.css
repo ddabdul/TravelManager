@@ -1353,3 +1353,20 @@ small {
 .daycount-month .value.zero {
   color: var(--text-secondary);
 }
+
+@media (max-width: 720px) {
+  .daycount-months {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .daycount-month {
+    padding: 6px;
+    border-radius: 8px;
+  }
+  .daycount-month .label {
+    font-size: 11px;
+  }
+  .daycount-month .value {
+    font-size: 16px;
+  }
+}
