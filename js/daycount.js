@@ -2,25 +2,12 @@
 // Day Count Helpers (per-passenger, per-country, per-month)
 // =========================
 
-// Minimal airport -> country map; extend as needed.
-const airportToCountry = {
-  // UK
-  BRS: "United Kingdom", LGW: "United Kingdom", LHR: "United Kingdom", LCY: "United Kingdom",
-  LTN: "United Kingdom", LCJ: "United Kingdom", MAN: "United Kingdom",
-  // Netherlands
-  AMS: "Netherlands",
-  // France
-  MRS: "France", ORY: "France", CDG: "France", TLS: "France", NCE: "France",
-  // Germany
-  MUC: "Germany", FRA: "Germany", BER: "Germany", HAM: "Germany", DUS: "Germany", CGN: "Germany",
-  // Cyprus
-  LCA: "Cyprus", PFO: "Cyprus"
-};
+import { airportToCountry } from "./airportCountries.js";
 
 function mapAirportToCountry(code) {
-  if (!code) return null;
+  if (!code) return "Other";
   const upper = String(code).toUpperCase();
-  return airportToCountry[upper] || null;
+  return airportToCountry[upper] || "Other";
 }
 
 export function getPassengerFlights(trips, passengerName) {
@@ -46,8 +33,8 @@ export function getPassengerFlights(trips, passengerName) {
         date,
         departureCode: depCode,
         arrivalCode: arrCode,
-        departureCountry: mapAirportToCountry(depCode) || `Unknown (${depCode || "-"})`,
-        arrivalCountry: mapAirportToCountry(arrCode) || `Unknown (${arrCode || "-"})`
+        departureCountry: mapAirportToCountry(depCode),
+        arrivalCountry: mapAirportToCountry(arrCode)
       });
     }
   }
@@ -73,7 +60,7 @@ export function calculateDaysByCountry(trips, passengerName, year) {
   }
 
   // Determine country at year start by simulating all flights up to the year boundary.
-  let currentCountry = flights[0].departureCountry || "Unknown";
+  let currentCountry = flights[0].departureCountry || "Other";
   for (const f of flights) {
     if (f.date < yearStart) {
       // Move to arrival country if different.
@@ -103,7 +90,7 @@ export function calculateDaysByCountry(trips, passengerName, year) {
   // Aggregate days per country/month
   const countries = {};
   for (const stay of stays) {
-    const country = stay.country || "Unknown";
+    const country = stay.country || "Other";
     if (!countries[country]) {
       countries[country] = Array(12).fill(0);
     }
