@@ -57,7 +57,7 @@ function cacheElements() {
     // Screen switching
     "screen-trips", "screen-daycount",
     // Nav buttons
-    "nav-trips", "nav-daycount"
+    "nav-trips", "nav-daycount",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
