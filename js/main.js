@@ -3,7 +3,8 @@
 // =========================
 
 import { loadTrips, saveTrips } from "./storage.js";
-import { loadApiKey, fetchRoute, apiState } from "./api.js";
+import { loadApiKey, fetchRoute } from "./api.js";
+import { apiState } from "./config.js";
 import { 
   normalizePassengerNames, 
   normalizeFlightNumber, 
