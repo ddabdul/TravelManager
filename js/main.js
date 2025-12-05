@@ -3,7 +3,7 @@
 // =========================
 
 import { loadTrips, saveTrips } from "./storage.js";
-import { loadApiKey, fetchRoute } from "./api.js";
+import { loadApiKey, fetchRoute, apiState } from "./api.js";
 import { 
   normalizePassengerNames, 
   normalizeFlightNumber, 
@@ -683,6 +683,7 @@ function setupEventListeners() {
           return;
         }
         localStorage.setItem("apiKeyOverride", key);
+        apiState.key = key;
         setStatusText("api-key-status", "API key loaded from upload.");
         setConfigUploadVisibility(false);
       } catch (err) {
