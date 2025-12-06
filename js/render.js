@@ -269,7 +269,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
               <span class="segment-flight-code">
                 ${headerRight || "Flight"}${!mobileView && pnrDisplay && pnrDisplay !== "—" ? ` <span class="pnr-text">• PNR ${pnrDisplay}</span>` : ""}
               </span>
-              <button class="delete-chip" data-type="flight" data-id="${leg.id}" aria-label="Delete flight">✕</button>
+              <button class="delete-chip" data-type="flight" data-id="${leg.id}" aria-label="Delete flight">🗑</button>
             </div>
             <div class="segment-main-row">
               <div class="segment-side">
@@ -330,7 +330,7 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
           <div class="segment-header-row">
             <span class="segment-label">Hotel</span>
             <span class="segment-flight-code">${h.hotelName || "Unnamed"}</span>
-            <button class="delete-chip" data-type="hotel" data-id="${h.id}" aria-label="Delete hotel">✕</button>
+            <button class="delete-chip" data-type="hotel" data-id="${h.id}" aria-label="Delete hotel">🗑</button>
           </div>
           <div class="segment-main-row">
             <div class="segment-side">
