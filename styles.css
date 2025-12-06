@@ -1234,6 +1234,22 @@ small {
   justify-content: flex-end;
 }
 
+.delete-chip {
+  border: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.04);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.delete-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* Bottom navigation (mobile) */
 .bottom-nav {
   position: fixed;

@@ -839,6 +839,30 @@ function setupEventListeners() {
     });
   }
 
+  // Delete flight/hotel from timeline
+  if (els["trip-events-list"]) {
+    els["trip-events-list"].addEventListener("click", (e) => {
+      const btn = e.target.closest(".delete-chip");
+      if (!btn) return;
+      const type = btn.dataset.type;
+      const id = btn.dataset.id;
+      if (!type || !id) return;
+      if (!confirm(`Delete this ${type}?`)) return;
+
+      const trip = trips.find(t => String(t.id) === String(activeTripId));
+      if (!trip) return;
+
+      if (type === "flight") {
+        trip.records = (trip.records || []).filter(r => String(r.id) !== String(id));
+      } else if (type === "hotel") {
+        trip.hotels = (trip.hotels || []).filter(h => String(h.id) !== String(id));
+      }
+
+      saveTrips(trips);
+      renderAll();
+    });
+  }
+
   // Mobile toggle All Trips Statistics
   if (els["toggle-alltrips-btn"]) {
     els["toggle-alltrips-btn"].addEventListener("click", () => {
