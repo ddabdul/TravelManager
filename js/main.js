@@ -323,57 +323,145 @@ function renderUpcomingScreen() {
     return;
   }
 
-  emptyEl.classList.add("hidden");
-  const sorted = allFlights.slice().sort((a, b) => a.date - b.date);
-  listEl.innerHTML = sorted.map((f) => {
-    const dateLabel = formatDateTimeLocal(f.departureTime || f.date);
-    const depTime = f.departureTime ? extractTime(f.departureTime) : "";
-    const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
-    const fn = f.flightNumber || "Flight";
-    const pnr = f.pnr || "";
-    const depCity = f.departureName || f.departureCode || "?";
-    const arrCity = f.arrivalName || f.arrivalCode || "?";
-    const pax = (f.paxNames || []).join(", ");
-    return `
-      <div class="flight-tile itinerary-tile">
-        <div class="flight-tile-header">
-          <div class="flight-tile-header-left">
-            <span class="event-type-icon event-type-icon-flight">✈︎</span>
-            <span class="flight-date">${dateLabel}</span>
-          </div>
-          <span class="flight-airline">${fn}</span>
-        </div>
-        <div class="itinerary-body">
-          <div class="itinerary-segment segment-flight">
-            <div class="segment-header-row">
-              <span class="segment-label">Upcoming</span>
-              <span class="segment-flight-code">
-                ${pnr ? `PNR: ${pnr}` : ""}
-                ${pax ? `${pnr ? " · " : ""}Pax: ${pax}` : ""}
-              </span>
+  // Group connecting flights by same PNR and departure day
+  const groupsMap = new Map();
+  const singles = [];
+
+  allFlights.forEach((f) => {
+    const pnrKey = (f.pnr || "").trim();
+    const depIso = f.departureTime || f.date;
+    const dayKey = depIso ? new Date(depIso).toISOString().slice(0, 10) : "";
+    if (pnrKey && dayKey) {
+      const key = `${dayKey}__${pnrKey}`;
+      if (!groupsMap.has(key)) groupsMap.set(key, []);
+      groupsMap.get(key).push(f);
+    } else {
+      singles.push(f);
+    }
+  });
+
+  const grouped = [];
+  groupsMap.forEach((arr) => {
+    if (arr.length > 1) grouped.push(arr);
+    else singles.push(arr[0]);
+  });
+
+  const tiles = [];
+
+  // Render grouped (connecting) flights
+  grouped
+    .map((arr) => arr.slice().sort((a, b) => (a.departureTime || a.date) - (b.departureTime || b.date)))
+    .sort((a, b) => (a[0].departureTime || a[0].date) - (b[0].departureTime || b[0].date))
+    .forEach((legs) => {
+      const first = legs[0];
+      const dateLabel = formatDateTimeLocal(first.departureTime || first.date);
+      const fn = first.flightNumber || "Flight";
+      const pnr = first.pnr || "";
+      const pax = Array.from(new Set(legs.flatMap((l) => l.paxNames || []))).join(", ");
+
+      const segments = legs.map((f) => {
+        const depTime = f.departureTime ? extractTime(f.departureTime) : "";
+        const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
+        const depCity = f.departureName || f.departureCode || "?";
+        const arrCity = f.arrivalName || f.arrivalCode || "?";
+        return `
+          <div class="segment-main-row" style="padding:6px 0;">
+            <div class="segment-side">
+              <div class="segment-city">${depCity}</div>
+              <div class="segment-code-time">
+                <span class="segment-time">${depTime}</span>
+              </div>
             </div>
-            <div class="segment-main-row">
-              <div class="segment-side">
-                <div class="segment-city">${depCity}</div>
-                <div class="segment-code-time">
-                  <span class="segment-time">${depTime}</span>
+            <div class="segment-arrow">
+              <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
+            </div>
+            <div class="segment-side segment-side-right">
+              <div class="segment-city">${arrCity}</div>
+              <div class="segment-code-time">
+                <span class="segment-time">${arrTime}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      tiles.push(`
+        <div class="flight-tile itinerary-tile">
+          <div class="flight-tile-header">
+            <div class="flight-tile-header-left">
+              <span class="event-type-icon event-type-icon-flight">✈︎</span>
+              <span class="flight-date">${dateLabel}</span>
+            </div>
+            <span class="flight-airline">${fn}</span>
+          </div>
+          <div class="itinerary-body">
+            <div class="itinerary-segment segment-flight">
+              <div class="segment-header-row">
+                <span class="segment-label">Connecting</span>
+                <span class="segment-flight-code">
+                  ${pnr ? `PNR: ${pnr}` : ""}${pnr && pax ? " · " : ""}${pax ? `Pax: ${pax}` : ""}
+                </span>
+              </div>
+              ${segments}
+            </div>
+          </div>
+        </div>
+      `);
+    });
+
+  // Render singles
+  singles
+    .sort((a, b) => a.date - b.date)
+    .forEach((f) => {
+      const dateLabel = formatDateTimeLocal(f.departureTime || f.date);
+      const depTime = f.departureTime ? extractTime(f.departureTime) : "";
+      const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
+      const fn = f.flightNumber || "Flight";
+      const pnr = f.pnr || "";
+      const depCity = f.departureName || f.departureCode || "?";
+      const arrCity = f.arrivalName || f.arrivalCode || "?";
+      const pax = (f.paxNames || []).join(", ");
+      tiles.push(`
+        <div class="flight-tile itinerary-tile">
+          <div class="flight-tile-header">
+            <div class="flight-tile-header-left">
+              <span class="event-type-icon event-type-icon-flight">✈︎</span>
+              <span class="flight-date">${dateLabel}</span>
+            </div>
+            <span class="flight-airline">${fn}</span>
+          </div>
+          <div class="itinerary-body">
+            <div class="itinerary-segment segment-flight">
+              <div class="segment-header-row">
+                <span class="segment-label">Upcoming</span>
+                <span class="segment-flight-code">
+                  ${pnr ? `PNR: ${pnr}` : ""}${pnr && pax ? " · " : ""}${pax ? `Pax: ${pax}` : ""}
+                </span>
+              </div>
+              <div class="segment-main-row">
+                <div class="segment-side">
+                  <div class="segment-city">${depCity}</div>
+                  <div class="segment-code-time">
+                    <span class="segment-time">${depTime}</span>
+                  </div>
+                </div>
+                <div class="segment-arrow">
+                  <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
+                </div>
+                <div class="segment-side segment-side-right">
+                  <div class="segment-city">${arrCity}</div>
+                  <div class="segment-code-time">
+                    <span class="segment-time">${arrTime}</span>
+                  </div>
                 </div>
               </div>
-              <div class="segment-arrow">
-                <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
-              </div>
-              <div class="segment-side segment-side-right">
-                <div class="segment-city">${arrCity}</div>
-                <div class="segment-code-time">
-                  <span class="segment-time">${arrTime}</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
-  }).join("");
+      `);
+    });
+
+  listEl.innerHTML = tiles.join("");
 }
 // Display current storage usage of the trips payload
 function updateStorageUsage() {
