@@ -317,6 +317,11 @@ function renderUpcomingScreen() {
     .map((f) => ({ ...f }))
     .filter((f) => f.date >= today);
 
+  const depMs = (f) => {
+    const d = new Date(f.departureTime || f.date);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  };
+
   if (!allFlights.length) {
     emptyEl.classList.remove("hidden");
     listEl.innerHTML = "";
@@ -350,8 +355,8 @@ function renderUpcomingScreen() {
 
   // Render grouped (connecting) flights
   grouped
-    .map((arr) => arr.slice().sort((a, b) => (a.departureTime || a.date) - (b.departureTime || b.date)))
-    .sort((a, b) => (a[0].departureTime || a[0].date) - (b[0].departureTime || b[0].date))
+    .map((arr) => arr.slice().sort((a, b) => depMs(a) - depMs(b)))
+    .sort((a, b) => depMs(a[0]) - depMs(b[0]))
     .forEach((legs) => {
       const first = legs[0];
       const dateLabel = formatDateTimeLocal(first.departureTime || first.date);
@@ -411,7 +416,7 @@ function renderUpcomingScreen() {
 
   // Render singles
   singles
-    .sort((a, b) => a.date - b.date)
+    .sort((a, b) => depMs(a) - depMs(b))
     .forEach((f) => {
       const dateLabel = formatDateTimeLocal(f.departureTime || f.date);
       const depTime = f.departureTime ? extractTime(f.departureTime) : "";
