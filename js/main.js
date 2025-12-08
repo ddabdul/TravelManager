@@ -22,7 +22,8 @@ import {
   renderHotelSelect,
   renderTripEvents
 } from "./render.js";
-import { calculateDaysByCountry, getPassengerYears, getUpcomingFlights } from "./daycount.js";
+import { calculateDaysByCountry, getPassengerYears } from "./daycount.js";
+import { getUpcomingFlights } from "./flights.js";
 
 // -- Globals --
 let trips = [];
@@ -324,19 +325,46 @@ function renderUpcomingScreen() {
   emptyEl.classList.add("hidden");
   const sorted = allFlights.slice().sort((a, b) => a.date - b.date);
   listEl.innerHTML = sorted.map((f) => {
-    const dateLabel = formatDateTimeLocal(f.date);
+    const dateLabel = formatDateTimeLocal(f.departureTime || f.date);
+    const depTime = f.departureTime ? extractTime(f.departureTime) : "";
+    const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
     const fn = f.flightNumber || "Flight";
-    const dep = f.departureName || f.departureCode || "?";
-    const arr = f.arrivalName || f.arrivalCode || "?";
+    const depCity = f.departureName || f.departureCode || "?";
+    const arrCity = f.arrivalName || f.arrivalCode || "?";
     const pax = (f.paxNames || []).join(", ");
-    const route = `${dep} → ${arr}`;
     return `
-      <div class="upcoming-item">
-        <div class="upcoming-date">${dateLabel}</div>
-        <div class="upcoming-meta">
-          <div class="upcoming-fn">${fn}</div>
-          <div class="upcoming-route">${route}</div>
-          ${pax ? `<div class="upcoming-route">Pax: ${pax}</div>` : ""}
+      <div class="flight-tile itinerary-tile">
+        <div class="flight-tile-header">
+          <div class="flight-tile-header-left">
+            <span class="event-type-icon event-type-icon-flight">✈︎</span>
+            <span class="flight-date">${dateLabel}</span>
+          </div>
+          <span class="flight-airline">${fn}</span>
+        </div>
+        <div class="itinerary-body">
+          <div class="itinerary-segment segment-flight">
+            <div class="segment-header-row">
+              <span class="segment-label">Upcoming</span>
+              ${pax ? `<span class="segment-flight-code">Pax: ${pax}</span>` : ""}
+            </div>
+            <div class="segment-main-row">
+              <div class="segment-side">
+                <div class="segment-city">${depCity}</div>
+                <div class="segment-code-time">
+                  <span class="segment-time">${depTime}</span>
+                </div>
+              </div>
+              <div class="segment-arrow">
+                <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
+              </div>
+              <div class="segment-side segment-side-right">
+                <div class="segment-city">${arrCity}</div>
+                <div class="segment-code-time">
+                  <span class="segment-time">${arrTime}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     `;
