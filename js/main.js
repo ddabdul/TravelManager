@@ -10,7 +10,8 @@ import {
   normalizeFlightNumber, 
   isValidFlightNumber, 
   cloneRouteWithDate, 
-  generateHotelId 
+  generateHotelId,
+  formatShortDate 
 } from "./utils.js";
 import { findCachedRoute, getAllPassengers } from "./data.js";
 import {
@@ -20,7 +21,7 @@ import {
   renderHotelSelect,
   renderTripEvents
 } from "./render.js";
-import { calculateDaysByCountry, getPassengerYears } from "./daycount.js";
+import { calculateDaysByCountry, getPassengerYears, getUpcomingFlights } from "./daycount.js";
 
 // -- Globals --
 let trips = [];
@@ -54,6 +55,7 @@ function cacheElements() {
     "config-upload-btn", "config-upload-file",
     // Daycount view
     "daycount-passenger", "daycount-year-list", "daycount-results", "daycount-empty",
+    "daycount-upcoming-empty", "daycount-upcoming-list",
     // Screen switching
     "screen-trips", "screen-daycount",
     // Nav buttons
@@ -191,6 +193,8 @@ function renderDaycountView() {
   const yearList = els["daycount-year-list"];
   const resultsEl = els["daycount-results"];
   const emptyEl = els["daycount-empty"];
+  const upcomingList = els["daycount-upcoming-list"];
+  const upcomingEmpty = els["daycount-upcoming-empty"];
   if (!passSelect || !yearList || !resultsEl || !emptyEl) return;
 
   const passengers = getAllPassengers(trips);
@@ -212,6 +216,11 @@ function renderDaycountView() {
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
     yearList.innerHTML = "";
+    if (upcomingEmpty && upcomingList) {
+      upcomingEmpty.textContent = "No upcoming flights.";
+      upcomingEmpty.classList.remove("hidden");
+      upcomingList.innerHTML = "";
+    }
     return;
   }
 
@@ -221,6 +230,11 @@ function renderDaycountView() {
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
     yearList.innerHTML = "";
+    if (upcomingEmpty && upcomingList) {
+      upcomingEmpty.textContent = "No upcoming flights.";
+      upcomingEmpty.classList.remove("hidden");
+      upcomingList.innerHTML = "";
+    }
     return;
   }
 
@@ -239,6 +253,11 @@ function renderDaycountView() {
     emptyEl.textContent = "No travel data for this year.";
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
+    if (upcomingEmpty && upcomingList) {
+      upcomingEmpty.textContent = "No upcoming flights.";
+      upcomingEmpty.classList.remove("hidden");
+      upcomingList.innerHTML = "";
+    }
     return;
   }
 
@@ -267,6 +286,32 @@ function renderDaycountView() {
       </div>
     `;
   }).join("");
+
+  // Upcoming flights list
+  const upcoming = getUpcomingFlights(trips, daycountState.passenger);
+  if (!upcomingEmpty || !upcomingList) return;
+  if (!upcoming.length) {
+    upcomingEmpty.textContent = "No upcoming flights.";
+    upcomingEmpty.classList.remove("hidden");
+    upcomingList.innerHTML = "";
+  } else {
+    upcomingEmpty.classList.add("hidden");
+    const sorted = upcoming.slice().sort((a, b) => a.date - b.date);
+    upcomingList.innerHTML = sorted.map((f) => {
+      const dateLabel = formatShortDate(f.date.toISOString());
+      const fn = f.flightNumber || "Flight";
+      const route = [f.departureCode || "?", f.arrivalCode || "?"].join(" → ");
+      return `
+        <div class="upcoming-item">
+          <div class="upcoming-date">${dateLabel}</div>
+          <div class="upcoming-meta">
+            <div class="upcoming-fn">${fn}</div>
+            <div class="upcoming-route">${route}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
 }
 // Display current storage usage of the trips payload
 function updateStorageUsage() {

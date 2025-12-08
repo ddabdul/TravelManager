@@ -1370,6 +1370,47 @@ small {
   color: var(--text-secondary);
 }
 
+/* Upcoming flights */
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.upcoming-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--card-bg);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.upcoming-date {
+  font-weight: 700;
+  font-size: 14px;
+  min-width: 72px;
+  color: var(--text-main);
+}
+
+.upcoming-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upcoming-fn {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.upcoming-route {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 @media (max-width: 720px) {
   .daycount-months {
     grid-template-columns: repeat(3, minmax(0, 1fr));

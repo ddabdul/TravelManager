@@ -31,6 +31,10 @@ export function getPassengerFlights(trips, passengerName) {
 
       flights.push({
         date,
+        flightNumber: (rec.route.flightNumber || rec.flightNumber || "").toString(),
+        airline: rec.route.airline || null,
+        tripId: trip.id,
+        recordId: rec.id,
         departureCode: depCode,
         arrivalCode: arrCode,
         departureCountry: mapAirportToCountry(depCode),
@@ -40,6 +44,12 @@ export function getPassengerFlights(trips, passengerName) {
   }
   flights.sort((a, b) => a.date - b.date);
   return flights;
+}
+
+export function getUpcomingFlights(trips, passengerName) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return getPassengerFlights(trips, passengerName).filter((f) => f.date >= today);
 }
 
 export function getPassengerYears(trips, passengerName) {
