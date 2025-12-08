@@ -11,7 +11,7 @@ function mapAirportToCountry(code) {
 }
 
 export function getPassengerFlights(trips, passengerName) {
-  if (!passengerName) return [];
+  if (!passengerName && passengerName !== null) return [];
   const flights = [];
   for (const trip of trips || []) {
     if (!trip || !Array.isArray(trip.records)) continue;
@@ -28,6 +28,8 @@ export function getPassengerFlights(trips, passengerName) {
 
       const depCode = dep.iata || dep.icao || null;
       const arrCode = arr.iata || arr.icao || null;
+      const depName = dep.airport || depCode || "";
+      const arrName = arr.airport || arrCode || "";
 
       flights.push({
         date,
@@ -37,6 +39,8 @@ export function getPassengerFlights(trips, passengerName) {
         recordId: rec.id,
         departureCode: depCode,
         arrivalCode: arrCode,
+        departureName: depName,
+        arrivalName: arrName,
         departureCountry: mapAirportToCountry(depCode),
         arrivalCountry: mapAirportToCountry(arrCode)
       });

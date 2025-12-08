@@ -67,6 +67,7 @@
     <div class="screen-tabs desktop-tabs">
       <button class="tab-btn active" data-screen="trips">Trips</button>
       <button class="tab-btn" data-screen="daycount">Days by Country</button>
+      <button class="tab-btn" data-screen="upcoming">Upcoming Flights</button>
     </div>
 
     <div class="screen-container">
@@ -183,6 +184,19 @@
           <div class="card-subtitle" style="margin-top:12px;">Upcoming flights</div>
           <div id="daycount-upcoming-empty" class="tiles-empty">No upcoming flights.</div>
           <div id="daycount-upcoming-list" class="upcoming-list"></div>
+        </div>
+      </section>
+
+      <section id="screen-upcoming" class="screen">
+        <div class="card card-daycount">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Upcoming Flights</div>
+              <div class="card-subtitle">All passengers, sorted by departure</div>
+            </div>
+          </div>
+          <div id="upcoming-empty" class="tiles-empty">No upcoming flights.</div>
+          <div id="upcoming-list" class="upcoming-list"></div>
         </div>
       </section>
     </div>
@@ -339,6 +353,7 @@
   <nav class="bottom-nav">
     <button id="nav-trips" class="nav-btn active" data-screen="trips">Trips</button>
     <button id="nav-daycount" class="nav-btn" data-screen="daycount">Days</button>
+    <button id="nav-upcoming" class="nav-btn" data-screen="upcoming">Upcoming</button>
   </nav>
 
   <!-- Note: type="module" is required for the modular JS to work -->

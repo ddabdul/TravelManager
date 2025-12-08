@@ -11,7 +11,8 @@ import {
   isValidFlightNumber, 
   cloneRouteWithDate, 
   generateHotelId,
-  formatShortDate 
+  formatShortDate,
+  formatDateTimeLocal
 } from "./utils.js";
 import { findCachedRoute, getAllPassengers } from "./data.js";
 import {
@@ -56,10 +57,12 @@ function cacheElements() {
     // Daycount view
     "daycount-passenger", "daycount-year-list", "daycount-results", "daycount-empty",
     "daycount-upcoming-empty", "daycount-upcoming-list",
+    // Upcoming flights screen
+    "upcoming-empty", "upcoming-list",
     // Screen switching
-    "screen-trips", "screen-daycount",
+    "screen-trips", "screen-daycount", "screen-upcoming",
     // Nav buttons
-    "nav-trips", "nav-daycount",
+    "nav-trips", "nav-daycount", "nav-upcoming",
     // All trips statistics card
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
@@ -171,7 +174,7 @@ function setTopbarMenuOpen(open) {
 const monthLabels = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function switchScreen(screen) {
-  currentScreen = screen === "daycount" ? "daycount" : "trips";
+  currentScreen = screen === "daycount" ? "daycount" : screen === "upcoming" ? "upcoming" : "trips";
   document.querySelectorAll(".screen").forEach((s) => {
     const active = s.id === `screen-${currentScreen}`;
     s.classList.toggle("active-screen", active);
@@ -185,6 +188,8 @@ function switchScreen(screen) {
   });
   if (currentScreen === "daycount") {
     renderDaycountView();
+  } else if (currentScreen === "upcoming") {
+    renderUpcomingScreen();
   }
 }
 
@@ -298,9 +303,11 @@ function renderDaycountView() {
     upcomingEmpty.classList.add("hidden");
     const sorted = upcoming.slice().sort((a, b) => a.date - b.date);
     upcomingList.innerHTML = sorted.map((f) => {
-      const dateLabel = formatShortDate(f.date.toISOString());
+      const dateLabel = formatDateTimeLocal(f.date);
       const fn = f.flightNumber || "Flight";
-      const route = [f.departureCode || "?", f.arrivalCode || "?"].join(" → ");
+      const dep = f.departureName || f.departureCode || "?";
+      const arr = f.arrivalName || f.arrivalCode || "?";
+      const route = `${dep} → ${arr}`;
       return `
         <div class="upcoming-item">
           <div class="upcoming-date">${dateLabel}</div>
@@ -312,6 +319,45 @@ function renderDaycountView() {
       `;
     }).join("");
   }
+}
+
+function renderUpcomingScreen() {
+  const listEl = els["upcoming-list"];
+  const emptyEl = els["upcoming-empty"];
+  if (!listEl || !emptyEl) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const allFlights = getUpcomingFlights(trips, null)
+    .map((f) => ({ ...f }))
+    .filter((f) => f.date >= today);
+
+  if (!allFlights.length) {
+    emptyEl.classList.remove("hidden");
+    listEl.innerHTML = "";
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+  const sorted = allFlights.slice().sort((a, b) => a.date - b.date);
+  listEl.innerHTML = sorted.map((f) => {
+    const dateLabel = formatDateTimeLocal(f.date);
+    const fn = f.flightNumber || "Flight";
+    const dep = f.departureName || f.departureCode || "?";
+    const arr = f.arrivalName || f.arrivalCode || "?";
+    const pax = (f.paxNames || []).join(", ");
+    const route = `${dep} → ${arr}`;
+    return `
+      <div class="upcoming-item">
+        <div class="upcoming-date">${dateLabel}</div>
+        <div class="upcoming-meta">
+          <div class="upcoming-fn">${fn}</div>
+          <div class="upcoming-route">${route}</div>
+          ${pax ? `<div class="upcoming-route">Pax: ${pax}</div>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 // Display current storage usage of the trips payload
 function updateStorageUsage() {
