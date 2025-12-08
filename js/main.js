@@ -371,12 +371,17 @@ function renderUpcomingScreen() {
     const segments = legs.map((f) => {
       const depTime = f.departureTime ? extractTime(f.departureTime) : "";
       const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
-      const depCity = f.departureName || f.departureCode || "?";
-      const arrCity = f.arrivalName || f.arrivalCode || "?";
+      const depName = f.departureName || f.departureCode || "?";
+      const arrName = f.arrivalName || f.arrivalCode || "?";
+      const depCode = f.departureCode || (depName ? depName.slice(0, 3).toUpperCase() : "?");
+      const arrCode = f.arrivalCode || (arrName ? arrName.slice(0, 3).toUpperCase() : "?");
       return `
         <div class="segment-main-row" style="padding:6px 0;">
           <div class="segment-side">
-            <div class="segment-city">${depCity}</div>
+            <div class="segment-city">
+              <span class="mobile-hide">${depName}</span>
+              <span class="mobile-only">${depCode}</span>
+            </div>
             <div class="segment-code-time">
               <span class="segment-time">${depTime}</span>
             </div>
@@ -385,7 +390,10 @@ function renderUpcomingScreen() {
             <span class="segment-icon segment-icon-flight" aria-hidden="true">✈︎</span>
           </div>
           <div class="segment-side segment-side-right">
-            <div class="segment-city">${arrCity}</div>
+            <div class="segment-city">
+              <span class="mobile-hide">${arrName}</span>
+              <span class="mobile-only">${arrCode}</span>
+            </div>
             <div class="segment-code-time">
               <span class="segment-time">${arrTime}</span>
             </div>
@@ -406,7 +414,7 @@ function renderUpcomingScreen() {
         <div class="itinerary-body">
           <div class="itinerary-segment segment-flight">
             <div class="segment-header-row">
-              <span class="segment-label">${isGroup ? "Connecting" : "Upcoming"}</span>
+              <span class="segment-label mobile-hide">${isGroup ? "Connecting" : "Upcoming"}</span>
               <span class="segment-flight-code">${infoLine}</span>
             </div>
             ${segments}
@@ -416,6 +424,7 @@ function renderUpcomingScreen() {
     `;
   });
 
+  emptyEl.classList.add("hidden");
   listEl.innerHTML = tiles.join("");
 }
 // Display current storage usage of the trips payload

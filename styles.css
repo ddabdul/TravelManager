@@ -1099,6 +1099,25 @@ small {
   transform: scale(1.05);
 }
 
+/* Mobile visibility helper */
+.mobile-hide {
+  display: inline;
+}
+@media (max-width: 720px) {
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
+.mobile-only {
+  display: none;
+}
+@media (max-width: 720px) {
+  .mobile-only {
+    display: inline !important;
+  }
+}
+
 /* Generic hidden helper */
 .hidden {
   display: none !important;
