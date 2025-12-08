@@ -180,10 +180,6 @@
             Select a passenger to view days by country.
           </div>
           <div id="daycount-results" class="daycount-grid"></div>
-
-          <div class="card-subtitle" style="margin-top:12px;">Upcoming flights</div>
-          <div id="daycount-upcoming-empty" class="tiles-empty">No upcoming flights.</div>
-          <div id="daycount-upcoming-list" class="upcoming-list"></div>
         </div>
       </section>
 
@@ -193,6 +189,14 @@
             <div>
               <div class="card-title">Upcoming Flights</div>
               <div class="card-subtitle">All passengers, sorted by departure</div>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field">
+              <label for="upcoming-passenger">Passenger</label>
+              <select id="upcoming-passenger">
+                <option value="">All passengers</option>
+              </select>
             </div>
           </div>
           <div id="upcoming-empty" class="tiles-empty">No upcoming flights.</div>

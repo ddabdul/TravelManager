@@ -57,6 +57,7 @@ function cacheElements() {
     // Daycount view
     "daycount-passenger", "daycount-year-list", "daycount-results", "daycount-empty",
     "daycount-upcoming-empty", "daycount-upcoming-list",
+    "upcoming-passenger",
     // Upcoming flights screen
     "upcoming-empty", "upcoming-list",
     // Screen switching
@@ -221,11 +222,6 @@ function renderDaycountView() {
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
     yearList.innerHTML = "";
-    if (upcomingEmpty && upcomingList) {
-      upcomingEmpty.textContent = "No upcoming flights.";
-      upcomingEmpty.classList.remove("hidden");
-      upcomingList.innerHTML = "";
-    }
     return;
   }
 
@@ -235,11 +231,6 @@ function renderDaycountView() {
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
     yearList.innerHTML = "";
-    if (upcomingEmpty && upcomingList) {
-      upcomingEmpty.textContent = "No upcoming flights.";
-      upcomingEmpty.classList.remove("hidden");
-      upcomingList.innerHTML = "";
-    }
     return;
   }
 
@@ -258,11 +249,6 @@ function renderDaycountView() {
     emptyEl.textContent = "No travel data for this year.";
     emptyEl.classList.remove("hidden");
     resultsEl.innerHTML = "";
-    if (upcomingEmpty && upcomingList) {
-      upcomingEmpty.textContent = "No upcoming flights.";
-      upcomingEmpty.classList.remove("hidden");
-      upcomingList.innerHTML = "";
-    }
     return;
   }
 
@@ -292,43 +278,31 @@ function renderDaycountView() {
     `;
   }).join("");
 
-  // Upcoming flights list
-  const upcoming = getUpcomingFlights(trips, daycountState.passenger);
-  if (!upcomingEmpty || !upcomingList) return;
-  if (!upcoming.length) {
-    upcomingEmpty.textContent = "No upcoming flights.";
-    upcomingEmpty.classList.remove("hidden");
-    upcomingList.innerHTML = "";
-  } else {
-    upcomingEmpty.classList.add("hidden");
-    const sorted = upcoming.slice().sort((a, b) => a.date - b.date);
-    upcomingList.innerHTML = sorted.map((f) => {
-      const dateLabel = formatDateTimeLocal(f.date);
-      const fn = f.flightNumber || "Flight";
-      const dep = f.departureName || f.departureCode || "?";
-      const arr = f.arrivalName || f.arrivalCode || "?";
-      const route = `${dep} → ${arr}`;
-      return `
-        <div class="upcoming-item">
-          <div class="upcoming-date">${dateLabel}</div>
-          <div class="upcoming-meta">
-            <div class="upcoming-fn">${fn}</div>
-            <div class="upcoming-route">${route}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
 }
 
 function renderUpcomingScreen() {
   const listEl = els["upcoming-list"];
   const emptyEl = els["upcoming-empty"];
+  const passSelect = els["upcoming-passenger"];
   if (!listEl || !emptyEl) return;
+
+  // Populate passengers
+  const passengers = getAllPassengers(trips);
+  if (passSelect) {
+    passSelect.innerHTML = '<option value="">All passengers</option>';
+    passengers.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      passSelect.appendChild(opt);
+    });
+  }
+
+  const filterPax = passSelect ? passSelect.value || null : null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const allFlights = getUpcomingFlights(trips, null)
+  const allFlights = getUpcomingFlights(trips, filterPax === "" ? null : filterPax)
     .map((f) => ({ ...f }))
     .filter((f) => f.date >= today);
 
@@ -927,6 +901,12 @@ function setupEventListeners() {
         daycountState.year = year;
         renderDaycountView();
       }
+    });
+  }
+
+  if (els["upcoming-passenger"]) {
+    els["upcoming-passenger"].addEventListener("change", () => {
+      renderUpcomingScreen();
     });
   }
 
