@@ -58,6 +58,18 @@ export function formatShortDate(dateStr) {
   });
 }
 
+export function formatDateTimeLocal(dateInput) {
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
 export function extractTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);

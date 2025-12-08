@@ -11,14 +11,15 @@ function mapAirportToCountry(code) {
 }
 
 export function getPassengerFlights(trips, passengerName) {
-  if (!passengerName && passengerName !== null) return [];
+  const includeAll = passengerName === null;
+  if (!includeAll && !passengerName) return [];
   const flights = [];
   for (const trip of trips || []) {
     if (!trip || !Array.isArray(trip.records)) continue;
     for (const rec of trip.records) {
       if (!rec || !rec.route) continue;
       const pax = Array.isArray(rec.paxNames) ? rec.paxNames.map((p) => String(p || "").trim()) : [];
-      if (!pax.includes(passengerName)) continue;
+      if (!includeAll && !pax.includes(passengerName)) continue;
 
       const dep = rec.route.departure || {};
       const arr = rec.route.arrival || {};
@@ -42,7 +43,8 @@ export function getPassengerFlights(trips, passengerName) {
         departureName: depName,
         arrivalName: arrName,
         departureCountry: mapAirportToCountry(depCode),
-        arrivalCountry: mapAirportToCountry(arrCode)
+        arrivalCountry: mapAirportToCountry(arrCode),
+        paxNames: pax
       });
     }
   }
