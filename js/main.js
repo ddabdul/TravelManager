@@ -12,7 +12,8 @@ import {
   cloneRouteWithDate, 
   generateHotelId,
   formatShortDate,
-  formatDateTimeLocal
+  formatDateTimeLocal,
+  extractTime
 } from "./utils.js";
 import { findCachedRoute, getAllPassengers } from "./data.js";
 import {
