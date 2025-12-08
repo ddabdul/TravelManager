@@ -31,6 +31,7 @@ let topbarMenuOpen = false;
 let lastIsMobile = null;
 let currentScreen = "trips";
 let daycountState = { passenger: "", year: new Date().getFullYear() };
+let upcomingState = { passenger: "" };
 
 // -- DOM Elements (cached for use in event listeners) --
 const els = {};
@@ -294,15 +295,23 @@ function renderUpcomingScreen() {
       const opt = document.createElement("option");
       opt.value = p;
       opt.textContent = p;
+      if (p === upcomingState.passenger) opt.selected = true;
       passSelect.appendChild(opt);
     });
+    // If stored passenger no longer exists, reset
+    if (upcomingState.passenger && !passengers.includes(upcomingState.passenger)) {
+      upcomingState.passenger = "";
+      passSelect.value = "";
+    }
   }
 
-  const filterPax = passSelect ? passSelect.value || null : null;
+  const filterPax = passSelect ? (passSelect.value || upcomingState.passenger || "") : upcomingState.passenger;
+  if (filterPax !== undefined) upcomingState.passenger = filterPax;
+  const filterValue = filterPax === "" ? null : filterPax;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const allFlights = getUpcomingFlights(trips, filterPax === "" ? null : filterPax)
+  const allFlights = getUpcomingFlights(trips, filterValue)
     .map((f) => ({ ...f }))
     .filter((f) => f.date >= today);
 
@@ -906,6 +915,7 @@ function setupEventListeners() {
 
   if (els["upcoming-passenger"]) {
     els["upcoming-passenger"].addEventListener("change", () => {
+      upcomingState.passenger = els["upcoming-passenger"].value || "";
       renderUpcomingScreen();
     });
   }
