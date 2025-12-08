@@ -364,6 +364,9 @@ function renderUpcomingScreen() {
     const fn = first.flightNumber || "Flight";
     const pnr = first.pnr || "";
     const pax = Array.from(new Set(legs.flatMap((l) => l.paxNames || []))).join(", ");
+    const pnrSpan = pnr ? `<span class="pnr-text">PNR: ${pnr}</span>` : "";
+    const paxSpan = pax ? `<span class="pax-text">Pax: ${pax}</span>` : "";
+    const infoLine = [pnrSpan, paxSpan].filter(Boolean).join(" · ");
 
     const segments = legs.map((f) => {
       const depTime = f.departureTime ? extractTime(f.departureTime) : "";
@@ -404,9 +407,7 @@ function renderUpcomingScreen() {
           <div class="itinerary-segment segment-flight">
             <div class="segment-header-row">
               <span class="segment-label">${isGroup ? "Connecting" : "Upcoming"}</span>
-              <span class="segment-flight-code">
-                ${pnr ? `PNR: ${pnr}` : ""}${pnr && pax ? " · " : ""}${pax ? `Pax: ${pax}` : ""}
-              </span>
+              <span class="segment-flight-code">${infoLine}</span>
             </div>
             ${segments}
           </div>
