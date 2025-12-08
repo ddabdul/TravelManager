@@ -330,6 +330,7 @@ function renderUpcomingScreen() {
     const depTime = f.departureTime ? extractTime(f.departureTime) : "";
     const arrTime = f.arrivalTime ? extractTime(f.arrivalTime) : "";
     const fn = f.flightNumber || "Flight";
+    const pnr = f.pnr || "";
     const depCity = f.departureName || f.departureCode || "?";
     const arrCity = f.arrivalName || f.arrivalCode || "?";
     const pax = (f.paxNames || []).join(", ");
@@ -346,7 +347,10 @@ function renderUpcomingScreen() {
           <div class="itinerary-segment segment-flight">
             <div class="segment-header-row">
               <span class="segment-label">Upcoming</span>
-              ${pax ? `<span class="segment-flight-code">Pax: ${pax}</span>` : ""}
+              <span class="segment-flight-code">
+                ${pnr ? `PNR: ${pnr}` : ""}
+                ${pax ? `${pnr ? " · " : ""}Pax: ${pax}` : ""}
+              </span>
             </div>
             <div class="segment-main-row">
               <div class="segment-side">

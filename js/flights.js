@@ -37,6 +37,7 @@ export function getPassengerFlights(trips, passengerName) {
         airline: rec.route.airline || null,
         tripId: trip.id,
         recordId: rec.id,
+        pnr: rec.pnr || "",
         departureCode: depCode,
         arrivalCode: arrCode,
         departureName: depName,
