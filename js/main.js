@@ -1208,9 +1208,14 @@ function setupEventListeners() {
     document.body.removeChild(a);
   });
 
-  els["import-json"].addEventListener("click", () => els["import-json-file"].click());
+  els["import-json"].addEventListener("click", () => {
+    const input = els["import-json-file"];
+    if (input) input.value = ""; // allow re-selecting the same file after clear/import
+    input?.click();
+  });
   els["import-json-file"].addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
+    const fileInput = e.target;
+    const file = fileInput.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -1224,6 +1229,7 @@ function setupEventListeners() {
           alert("Imported!");
         }
       } catch(err) { alert("Invalid JSON"); }
+      fileInput.value = ""; // reset so the same file can be chosen again
     };
     reader.readAsText(file);
   });
