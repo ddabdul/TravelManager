@@ -898,6 +898,7 @@ small {
   align-items: center;
   gap: 8px;
   font-size: 11px;
+  flex-wrap: wrap;
 }
 
 .segment-label {
@@ -906,12 +907,18 @@ small {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .segment-flight-code {
   font-size: 11px;
   color: var(--text-secondary);
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-align: right;
+  flex: 1 1 120px;
+  min-width: 0;
 }
 
 .segment-icon {
