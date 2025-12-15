@@ -59,19 +59,37 @@ export function formatShortDate(dateStr) {
 }
 
 export function formatDateTimeLocal(dateInput) {
-  const d = new Date(dateInput);
-  if (Number.isNaN(d.getTime())) return "";
+  if (!dateInput) return "";
+
+  // Prefer string parsing to avoid timezone shifts on devices.
+  if (typeof dateInput === "string") {
+    const match = dateInput.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}:\d{2})/);
+    if (match) {
+      const [, y, m, d, time] = match;
+      return `${d}/${m}/${y} ${time}`;
+    }
+  }
+
+  // Fallback for Date objects or unknown strings.
+  const dObj = new Date(dateInput);
+  if (Number.isNaN(dObj.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
-  const dd = pad(d.getDate());
-  const mm = pad(d.getMonth() + 1);
-  const yyyy = d.getFullYear();
-  const hh = pad(d.getHours());
-  const min = pad(d.getMinutes());
+  const dd = pad(dObj.getDate());
+  const mm = pad(dObj.getMonth() + 1);
+  const yyyy = dObj.getFullYear();
+  const hh = pad(dObj.getHours());
+  const min = pad(dObj.getMinutes());
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }
 
 export function extractTime(iso) {
-  if (!iso) return "";
+  if (!iso || typeof iso !== "string") return "";
+  // Preserve the literal clock time from the string to avoid timezone conversion.
+  const match = iso.match(/T(\d{2}:\d{2})/);
+  if (match) return match[1];
+  const matchWithSeconds = iso.match(/T(\d{2}:\d{2}:\d{2})/);
+  if (matchWithSeconds) return matchWithSeconds[1].slice(0, 5);
+
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
