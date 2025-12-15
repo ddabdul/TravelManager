@@ -81,6 +81,8 @@ function cacheElements() {
 
 let manualRouteMode = false;
 let editingFlightId = null;
+let importedRoutePreview = null;
+let importNoticeShown = false;
 
 // ------------------------------------------------------------------
 // Trip selector UI helper
@@ -171,16 +173,87 @@ function setFlightOverlayMode(mode) {
 function resetFlightOverlayState() {
   editingFlightId = null;
   manualRouteMode = false;
+  importedRoutePreview = null;
+  importNoticeShown = false;
   els["manual-route-section"]?.classList.add("hidden");
   els["flight-form"]?.reset();
   if (els["output"]) els["output"].textContent = "{}";
   setFlightOverlayMode("add");
 }
 
+function getIsoDateParts(iso) {
+  if (!iso || typeof iso !== "string" || !iso.includes("T")) {
+    return { date: "", time: "" };
+  }
+  return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
+}
+
+function showImportedRouteForReview(route, flightDate) {
+  if (!route) return;
+  importedRoutePreview = cloneRouteWithDate(route, flightDate);
+  manualRouteMode = true;
+
+  const dep = importedRoutePreview?.departure || {};
+  const arr = importedRoutePreview?.arrival || {};
+  const depParts = getIsoDateParts(dep.scheduled || "");
+  const arrParts = getIsoDateParts(arr.scheduled || "");
+  const dateValue = flightDate || depParts.date || "";
+
+  els["manual-route-section"]?.classList.remove("hidden");
+
+  const normalizedFn = normalizeFlightNumber(importedRoutePreview.flightNumber || "");
+  if (els["flight-number"] && !els["flight-number"].value) {
+    els["flight-number"].value = normalizedFn;
+  }
+  if (els["manual-flight-number"]) els["manual-flight-number"].value = normalizedFn;
+  if (els["manual-airline"]) els["manual-airline"].value = importedRoutePreview.airline || "";
+
+  if (els["flight-date"] && dateValue) els["flight-date"].value = dateValue;
+
+  if (els["manual-dep-airport"]) {
+    els["manual-dep-airport"].value = dep.airport || dep.city || dep.name || dep.iata || dep.icao || "";
+  }
+  if (els["manual-dep-iata"]) {
+    els["manual-dep-iata"].value = (dep.iata || dep.icao || "").toUpperCase();
+  }
+  if (els["manual-dep-time"]) els["manual-dep-time"].value = depParts.time || "";
+
+  if (els["manual-arr-airport"]) {
+    els["manual-arr-airport"].value = arr.airport || arr.city || arr.name || arr.iata || arr.icao || "";
+  }
+  if (els["manual-arr-iata"]) {
+    els["manual-arr-iata"].value = (arr.iata || arr.icao || "").toUpperCase();
+  }
+  if (els["manual-arr-time"]) els["manual-arr-time"].value = arrParts.time || "";
+
+  if (els["output"]) {
+    const depLabel = dep.airport || dep.city || dep.name || dep.iata || dep.icao || "Unknown departure";
+    const arrLabel = arr.airport || arr.city || arr.name || arr.iata || arr.icao || "Unknown arrival";
+    const previewText = [
+      "Imported flight details. Review and adjust before saving:",
+      `Flight: ${(importedRoutePreview.airline || "").trim()} ${normalizedFn}`.trim(),
+      dateValue ? `Date: ${formatShortDate(dateValue)} (${dateValue})` : "",
+      `From: ${depLabel}${dep.iata || dep.icao ? ` (${dep.iata || dep.icao})` : ""} at ${depParts.time || "??:??"}`,
+      `To: ${arrLabel}${arr.iata || arr.icao ? ` (${arr.iata || arr.icao})` : ""} at ${arrParts.time || "??:??"}`,
+      "",
+      "Update time/date below if they differ, then press Save flight."
+    ].filter(Boolean).join("\n");
+    els["output"].textContent = previewText;
+  }
+
+  if (!importNoticeShown) {
+    alert("Flight imported. Review time/date below and press Save flight to confirm.");
+    importNoticeShown = true;
+  }
+
+  validateFlightFormState();
+}
+
 function startEditFlight(record) {
   if (!record) return;
   editingFlightId = record.id;
   manualRouteMode = true;
+  importedRoutePreview = null;
   setFlightOverlayMode("edit");
 
   const route = record.route || {};
@@ -1201,34 +1274,17 @@ function setupEventListeners() {
       : null;
     let route;
 
-    if (manualRouteMode || editingId) {
-      const existingRoute = existingRecord?.route || {};
-      const depTimeVal = els["manual-dep-time"].value || extractTime(existingRoute.departure?.scheduled) || "00:00";
-      const arrTimeVal = els["manual-arr-time"].value || extractTime(existingRoute.arrival?.scheduled) || "00:00";
-      route = {
-        flightNumber: normalizeFlightNumber(els["manual-flight-number"].value || flightNumberRaw),
-        airline: els["manual-airline"].value.trim(),
-        departure: {
-          airport: els["manual-dep-airport"].value.trim() || existingRoute.departure?.airport || "",
-          iata: (els["manual-dep-iata"].value || existingRoute.departure?.iata || existingRoute.departure?.icao || "").trim().toUpperCase(),
-          scheduled: `${flightDate}T${depTimeVal}:00`
-        },
-        arrival: {
-          airport: els["manual-arr-airport"].value.trim() || existingRoute.arrival?.airport || "",
-          iata: (els["manual-arr-iata"].value || existingRoute.arrival?.iata || existingRoute.arrival?.icao || "").trim().toUpperCase(),
-          scheduled: `${flightDate}T${arrTimeVal}:00`
-        }
-      };
-    } else {
+    if (!manualRouteMode && !editingId) {
       try {
+        let baseRoute = null;
         const cached = findCachedRoute(trips, flightNumberRaw, flightDate);
         if (cached && confirm("Found saved route. Use it?")) {
-          route = cloneRouteWithDate(cached, flightDate);
+          baseRoute = cached;
         } else {
           els["output"].textContent = "Fetching...";
-          const baseRoute = await fetchRoute(flightNumberRaw);
-          route = cloneRouteWithDate(baseRoute, flightDate);
+          baseRoute = await fetchRoute(flightNumberRaw);
         }
+        showImportedRouteForReview(baseRoute, flightDate);
       } catch (err) {
         if (confirm(`API Error: ${err.message}. Enter manually?`)) {
           manualRouteMode = true;
@@ -1238,7 +1294,26 @@ function setupEventListeners() {
         }
         return;
       }
+      return;
     }
+
+    const existingRoute = existingRecord?.route || {};
+    const depTimeVal = els["manual-dep-time"].value || extractTime(existingRoute.departure?.scheduled) || "00:00";
+    const arrTimeVal = els["manual-arr-time"].value || extractTime(existingRoute.arrival?.scheduled) || "00:00";
+    route = {
+      flightNumber: normalizeFlightNumber(els["manual-flight-number"].value || flightNumberRaw),
+      airline: els["manual-airline"].value.trim(),
+      departure: {
+        airport: els["manual-dep-airport"].value.trim() || existingRoute.departure?.airport || "",
+        iata: (els["manual-dep-iata"].value || existingRoute.departure?.iata || existingRoute.departure?.icao || "").trim().toUpperCase(),
+        scheduled: `${flightDate}T${depTimeVal}:00`
+      },
+      arrival: {
+        airport: els["manual-arr-airport"].value.trim() || existingRoute.arrival?.airport || "",
+        iata: (els["manual-arr-iata"].value || existingRoute.arrival?.iata || existingRoute.arrival?.icao || "").trim().toUpperCase(),
+        scheduled: `${flightDate}T${arrTimeVal}:00`
+      }
+    };
 
     if (editingId) {
       const idx = currentTrip.records.findIndex(r => String(r.id) === String(editingId));
