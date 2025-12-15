@@ -80,6 +80,7 @@ function cacheElements() {
 }
 
 let manualRouteMode = false;
+let editingFlightId = null;
 
 // ------------------------------------------------------------------
 // Trip selector UI helper
@@ -150,6 +151,72 @@ function handleResponsiveResize() {
     renderAll();
   }
   syncAllTripsToggle();
+}
+
+function setFlightOverlayMode(mode) {
+  const titleEl = document.querySelector("#flight-overlay .card-title");
+  const subtitleEl = document.querySelector("#flight-overlay .card-subtitle");
+  const labelSpan = els.flightSubmitBtn?.querySelector("span:last-child");
+  if (mode === "edit") {
+    if (titleEl) titleEl.textContent = "Edit Flight";
+    if (subtitleEl) subtitleEl.textContent = "Update flight details";
+    if (labelSpan) labelSpan.textContent = "Update flight";
+  } else {
+    if (titleEl) titleEl.textContent = "Add Flight";
+    if (subtitleEl) subtitleEl.textContent = "Enter flight details";
+    if (labelSpan) labelSpan.textContent = "Save flight";
+  }
+}
+
+function resetFlightOverlayState() {
+  editingFlightId = null;
+  manualRouteMode = false;
+  els["manual-route-section"]?.classList.add("hidden");
+  els["flight-form"]?.reset();
+  if (els["output"]) els["output"].textContent = "{}";
+  setFlightOverlayMode("add");
+}
+
+function startEditFlight(record) {
+  if (!record) return;
+  editingFlightId = record.id;
+  manualRouteMode = true;
+  setFlightOverlayMode("edit");
+
+  const route = record.route || {};
+  const dep = route.departure || {};
+  const arr = route.arrival || {};
+  const depIso = dep.scheduled || record.flightDate || "";
+  const arrIso = arr.scheduled || "";
+  const depDate = depIso ? depIso.slice(0, 10) : "";
+  const depTime = depIso.includes("T") ? depIso.slice(11, 16) : "";
+  const arrTime = arrIso.includes("T") ? arrIso.slice(11, 16) : "";
+
+  els["flight-number"].value = route.flightNumber || record.flightNumber || "";
+  els["flight-date"].value = depDate || record.flightDate || "";
+  els["pnr"].value = record.pnr || "";
+
+  const passengers = normalizePassengerNames(record.paxNames || []);
+  const paxSelect = els["pax-existing"];
+  if (paxSelect) {
+    Array.from(paxSelect.options || []).forEach((opt) => {
+      opt.selected = passengers.includes(opt.value);
+    });
+  }
+  if (els["pax-new"]) els["pax-new"].value = "";
+
+  els["manual-airline"].value = route.airline || "";
+  els["manual-flight-number"].value = route.flightNumber || record.flightNumber || "";
+  els["manual-dep-airport"].value = dep.airport || dep.city || dep.name || dep.iata || dep.icao || "";
+  els["manual-dep-iata"].value = dep.iata || dep.icao || "";
+  els["manual-dep-time"].value = depTime || "";
+  els["manual-arr-airport"].value = arr.airport || arr.city || arr.name || arr.iata || arr.icao || "";
+  els["manual-arr-iata"].value = arr.iata || arr.icao || "";
+  els["manual-arr-time"].value = arrTime || "";
+
+  els["manual-route-section"]?.classList.remove("hidden");
+  els["flight-overlay"]?.classList.remove("hidden");
+  validateFlightFormState();
 }
 
 function setStatusText(id, text) {
@@ -838,7 +905,7 @@ function validateFlightFormState() {
     els["pax-error"].textContent = "";
   }
 
-  if (manualRouteMode) {
+  if (manualRouteMode && !editingFlightId) {
     let manualOk = true;
     if (!els["manual-dep-airport"].value.trim() || !els["manual-arr-airport"].value.trim()) manualOk = false;
     if (!els["manual-dep-time"].value || !els["manual-arr-time"].value) manualOk = false;
@@ -1008,6 +1075,15 @@ function setupEventListeners() {
   // Delete flight/hotel from timeline
   if (els["trip-events-list"]) {
     els["trip-events-list"].addEventListener("click", (e) => {
+      const editBtn = e.target.closest(".edit-chip");
+      if (editBtn) {
+        const id = editBtn.dataset.id;
+        const trip = trips.find(t => String(t.id) === String(activeTripId));
+        const record = trip?.records?.find(r => String(r.id) === String(id));
+        if (record) startEditFlight(record);
+        return;
+      }
+
       const btn = e.target.closest(".delete-chip");
       if (!btn) return;
       const type = btn.dataset.type;
@@ -1074,14 +1150,19 @@ function setupEventListeners() {
 
   // UI Overlays
   els["add-flight-btn"].addEventListener("click", () => {
-    manualRouteMode = false;
-    els["manual-route-section"].classList.add("hidden");
+    resetFlightOverlayState();
     els["flight-overlay"].classList.remove("hidden");
     validateFlightFormState();
   });
   
-  els["close-flight-overlay"].addEventListener("click", () => els["flight-overlay"].classList.add("hidden"));
-  els["cancel-flight-btn"].addEventListener("click", () => els["flight-overlay"].classList.add("hidden"));
+  els["close-flight-overlay"].addEventListener("click", () => {
+    resetFlightOverlayState();
+    els["flight-overlay"].classList.add("hidden");
+  });
+  els["cancel-flight-btn"].addEventListener("click", () => {
+    resetFlightOverlayState();
+    els["flight-overlay"].classList.add("hidden");
+  });
 
   els["add-hotel-btn"].addEventListener("click", () => {
     els["hotel-overlay"].classList.remove("hidden");
@@ -1104,6 +1185,7 @@ function setupEventListeners() {
   els["flight-form"].addEventListener("submit", async (e) => {
     e.preventDefault();
     if (els.flightSubmitBtn.disabled) return;
+    const editingId = editingFlightId;
 
     const flightNumberRaw = els["flight-number"].value.trim();
     const flightDate = els["flight-date"].value;
@@ -1114,21 +1196,27 @@ function setupEventListeners() {
     const paxNames = normalizePassengerNames([...selectedPax, ...newPax]);
 
     const currentTrip = getCurrentTrip();
+    const existingRecord = editingId
+      ? currentTrip.records.find(r => String(r.id) === String(editingId))
+      : null;
     let route;
 
-    if (manualRouteMode) {
+    if (manualRouteMode || editingId) {
+      const existingRoute = existingRecord?.route || {};
+      const depTimeVal = els["manual-dep-time"].value || extractTime(existingRoute.departure?.scheduled) || "00:00";
+      const arrTimeVal = els["manual-arr-time"].value || extractTime(existingRoute.arrival?.scheduled) || "00:00";
       route = {
         flightNumber: normalizeFlightNumber(els["manual-flight-number"].value || flightNumberRaw),
         airline: els["manual-airline"].value.trim(),
         departure: {
-          airport: els["manual-dep-airport"].value.trim(),
-          iata: els["manual-dep-iata"].value.trim().toUpperCase(),
-          scheduled: `${flightDate}T${els["manual-dep-time"].value}:00`
+          airport: els["manual-dep-airport"].value.trim() || existingRoute.departure?.airport || "",
+          iata: (els["manual-dep-iata"].value || existingRoute.departure?.iata || existingRoute.departure?.icao || "").trim().toUpperCase(),
+          scheduled: `${flightDate}T${depTimeVal}:00`
         },
         arrival: {
-          airport: els["manual-arr-airport"].value.trim(),
-          iata: els["manual-arr-iata"].value.trim().toUpperCase(),
-          scheduled: `${flightDate}T${els["manual-arr-time"].value}:00`
+          airport: els["manual-arr-airport"].value.trim() || existingRoute.arrival?.airport || "",
+          iata: (els["manual-arr-iata"].value || existingRoute.arrival?.iata || existingRoute.arrival?.icao || "").trim().toUpperCase(),
+          scheduled: `${flightDate}T${arrTimeVal}:00`
         }
       };
     } else {
@@ -1152,21 +1240,33 @@ function setupEventListeners() {
       }
     }
 
-    currentTrip.records.push({
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
-      flightDate,
-      pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
-      paxNames,
-      route
-    });
+    if (editingId) {
+      const idx = currentTrip.records.findIndex(r => String(r.id) === String(editingId));
+      if (idx !== -1) {
+        const existing = currentTrip.records[idx];
+        currentTrip.records[idx] = {
+          ...existing,
+          flightDate,
+          pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
+          paxNames,
+          route
+        };
+      }
+    } else {
+      currentTrip.records.push({
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+        flightDate,
+        pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
+        paxNames,
+        route
+      });
+    }
 
     saveTrips(trips);
     renderAll();
+    resetFlightOverlayState();
     els["flight-overlay"].classList.add("hidden");
-    
-    els["flight-form"].reset();
-    els["output"].textContent = "{}";
   });
 
   // Hotel Submit
