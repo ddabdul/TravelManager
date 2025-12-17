@@ -1351,6 +1351,17 @@ small {
   border: none;
 }
 
+.map-actions {
+  display: none;
+  margin-top: 10px;
+}
+
+@media (max-width: 720px) {
+  .map-actions {
+    display: flex;
+  }
+}
+
 .route-count-badge {
   width: 44px;
   height: 44px;
@@ -1379,6 +1390,59 @@ small {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 720px) {
+  body.map-fullscreen {
+    overflow: hidden;
+  }
+
+  body.map-fullscreen .topbar,
+  body.map-fullscreen .desktop-tabs,
+  body.map-fullscreen .bottom-nav {
+    display: none !important;
+  }
+
+  body.map-fullscreen .app-shell,
+  body.map-fullscreen .screen-container {
+    padding: 0 !important;
+  }
+
+  body.map-fullscreen #screen-map .card {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    border-radius: 0;
+    z-index: 2000;
+  }
+
+  body.map-fullscreen #screen-map .card-header,
+  body.map-fullscreen #screen-map .field-group,
+  body.map-fullscreen #screen-map #map-empty,
+  body.map-fullscreen #screen-map #map-warning {
+    display: none !important;
+  }
+
+  body.map-fullscreen #screen-map .map-actions {
+    display: flex !important;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    z-index: 2100;
+    margin: 0;
+    gap: 10px;
+    justify-content: center;
+    pointer-events: auto;
+  }
+
+  body.map-fullscreen #map-canvas.map-canvas {
+    height: 100vh;
+    min-height: 100vh;
+    margin-top: 0;
+    border-radius: 0;
+    border: none;
+  }
 }
 
 /* Daycount view */

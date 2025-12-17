@@ -35,7 +35,13 @@ let lastIsMobile = null;
 let currentScreen = "trips";
 let daycountState = { passenger: "", year: new Date().getFullYear() };
 let upcomingState = { passenger: "" };
-let mapState = { passenger: null, routeKey: null, year: new Date().getFullYear() };
+let mapState = {
+  passenger: null,
+  routeKey: null,
+  year: new Date().getFullYear(),
+  showBadges: true,
+  fullscreen: false
+};
 
 let mapInstance = null;
 let mapRoutesLayer = null;
@@ -72,6 +78,7 @@ function cacheElements() {
     "upcoming-empty", "upcoming-list",
     // Map screen
     "map-passenger", "map-route", "map-year-list", "map-empty", "map-warning", "map-canvas",
+    "map-fullscreen-btn", "map-badges-btn",
     // Screen switching
     "screen-trips", "screen-daycount", "screen-upcoming", "screen-map",
     // Nav buttons
@@ -352,6 +359,8 @@ function switchScreen(screen) {
     renderUpcomingScreen();
   } else if (currentScreen === "map") {
     renderMapScreen();
+  } else {
+    if (mapState.fullscreen) setMapFullscreen(false);
   }
 }
 
@@ -908,7 +917,6 @@ function renderMapFlights() {
   const allFlightsRaw = getPassengerFlights(trips, null);
   const yearFlightsRaw = allFlightsRaw.filter((f) => f.date.getFullYear() === mapState.year);
   const yearFlights = dedupeFlightsForMap(yearFlightsRaw);
-  const duplicatesRemovedCount = yearFlightsRaw.length - yearFlights.length;
 
   const filtered = mapState.passenger
     ? yearFlights.filter((f) => (f.paxNames || []).includes(mapState.passenger))
@@ -1101,17 +1109,19 @@ function renderMapFlights() {
           <div class="route-count-arrow" style="transform: rotate(${planeRotationAdj(rotAB)}deg);">&#9992;</div>
         </div>
       `;
-      window.L.marker(labelLatLng, {
-        zIndexOffset: countAB,
-        icon: window.L.divIcon({
-          className: "route-count-icon",
-          html: labelHtmlForward,
-          iconSize: [44, 44],
-          iconAnchor: [22, 22]
+      if (mapState.showBadges) {
+        window.L.marker(labelLatLng, {
+          zIndexOffset: countAB,
+          icon: window.L.divIcon({
+            className: "route-count-icon",
+            html: labelHtmlForward,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+          })
         })
-      })
-        .bindPopup(popup)
-        .addTo(mapLabelsLayer);
+          .bindPopup(popup)
+          .addTo(mapLabelsLayer);
+      }
     }
 
     if (countBA) {
@@ -1121,17 +1131,19 @@ function renderMapFlights() {
           <div class="route-count-arrow" style="transform: rotate(${planeRotationAdj(rotBA)}deg);">&#9992;</div>
         </div>
       `;
-      window.L.marker(labelLatLngBA, {
-        zIndexOffset: countBA,
-        icon: window.L.divIcon({
-          className: "route-count-icon",
-          html: labelHtmlBack,
-          iconSize: [44, 44],
-          iconAnchor: [22, 22]
+      if (mapState.showBadges) {
+        window.L.marker(labelLatLngBA, {
+          zIndexOffset: countBA,
+          icon: window.L.divIcon({
+            className: "route-count-icon",
+            html: labelHtmlBack,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+          })
         })
-      })
-        .bindPopup(popup)
-        .addTo(mapLabelsLayer);
+          .bindPopup(popup)
+          .addTo(mapLabelsLayer);
+      }
     }
   }
 
@@ -1156,7 +1168,6 @@ function renderMapFlights() {
       ? `Showing ${mappedFlightsCount} flight${mappedFlightsCount === 1 ? "" : "s"} on the map for the selected route. `
       : `Showing ${mappedFlightsCount} of ${filtered.length} flights on the map. `;
     warnEl.textContent =
-      `${duplicatesRemovedCount ? `Removed ${duplicatesRemovedCount} duplicate flight${duplicatesRemovedCount === 1 ? "" : "s"}. ` : ""}` +
       shownText +
       "Missing coordinates for: " +
       Array.from(missingCodes).filter(Boolean).sort().join(", ") +
@@ -1169,18 +1180,12 @@ function renderMapFlights() {
         ? `Showing ${mappedFlightsCount} flight${mappedFlightsCount === 1 ? "" : "s"} on the map for the selected route. `
         : `Showing ${mappedFlightsCount} of ${filtered.length} flights on the map. `;
       warnEl.textContent =
-        `${duplicatesRemovedCount ? `Removed ${duplicatesRemovedCount} duplicate flight${duplicatesRemovedCount === 1 ? "" : "s"}. ` : ""}` +
         shownText +
         (skippedSameCityCount ? `${skippedSameCityCount} within the same city were skipped. ` : "") +
         (skippedMissingCoordsCount ? `${skippedMissingCoordsCount} missing coordinates were skipped.` : "");
     } else {
-      if (duplicatesRemovedCount) {
-        warnEl.classList.remove("hidden");
-        warnEl.textContent = `Removed ${duplicatesRemovedCount} duplicate flight${duplicatesRemovedCount === 1 ? "" : "s"}.`;
-      } else {
-        warnEl.classList.add("hidden");
-        warnEl.textContent = "";
-      }
+      warnEl.classList.add("hidden");
+      warnEl.textContent = "";
     }
   }
 
@@ -1197,6 +1202,28 @@ function renderMapFlights() {
 function renderMapScreen() {
   renderMapControls();
   renderMapFlights();
+  syncMapActionButtons();
+}
+
+function setMapFullscreen(on) {
+  mapState.fullscreen = !!on;
+  document.body.classList.toggle("map-fullscreen", mapState.fullscreen);
+  syncMapActionButtons();
+  if (mapInstance) {
+    setTimeout(() => mapInstance.invalidateSize(), 0);
+  }
+}
+
+function syncMapActionButtons() {
+  const fsBtn = els["map-fullscreen-btn"];
+  const badgesBtn = els["map-badges-btn"];
+  if (fsBtn) {
+    fsBtn.textContent = mapState.fullscreen ? "Exit full screen" : "Full screen";
+  }
+  if (badgesBtn) {
+    badgesBtn.textContent = mapState.showBadges ? "Hide badges" : "Show badges";
+    badgesBtn.setAttribute("aria-pressed", mapState.showBadges ? "true" : "false");
+  }
 }
 
 // Display current storage usage of the trips payload
@@ -1787,6 +1814,18 @@ function setupEventListeners() {
       const val = e.target.value;
       mapState.routeKey = val === "__all__" ? null : val;
       renderMapScreen();
+    });
+  }
+  if (els["map-badges-btn"]) {
+    els["map-badges-btn"].addEventListener("click", () => {
+      mapState.showBadges = !mapState.showBadges;
+      renderMapFlights();
+      syncMapActionButtons();
+    });
+  }
+  if (els["map-fullscreen-btn"]) {
+    els["map-fullscreen-btn"].addEventListener("click", () => {
+      setMapFullscreen(!mapState.fullscreen);
     });
   }
   if (els["map-year-list"]) {
