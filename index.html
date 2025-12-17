@@ -7,6 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="stylesheet" href="styles.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
   <link rel="apple-touch-icon" href="icon/apple-touch-icon.png" />
 </head>
 <body>
@@ -68,6 +72,7 @@
       <button class="tab-btn active" data-screen="trips">Trips</button>
       <button class="tab-btn" data-screen="daycount">Days by Country</button>
       <button class="tab-btn" data-screen="upcoming">Upcoming Flights</button>
+      <button class="tab-btn" data-screen="map">Map</button>
     </div>
 
     <div class="screen-container">
@@ -201,6 +206,41 @@
           </div>
           <div id="upcoming-empty" class="tiles-empty">No upcoming flights.</div>
           <div id="upcoming-list" class="upcoming-list"></div>
+        </div>
+      </section>
+
+      <section id="screen-map" class="screen">
+        <div class="card card-daycount">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Map</div>
+              <div class="card-subtitle">Flights for a selected year</div>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field">
+              <label for="map-passenger">Passenger</label>
+              <select id="map-passenger">
+                <option value="__all__">All passengers</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="map-route">Route</label>
+              <select id="map-route">
+                <option value="__all__">All routes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Year</label>
+              <div id="map-year-list" class="chip-row"></div>
+            </div>
+          </div>
+
+          <div id="map-empty" class="tiles-empty">
+            Add flights to visualize them on a map.
+          </div>
+          <div id="map-warning" class="field-error hidden"></div>
+          <div id="map-canvas" class="map-canvas" aria-label="Map"></div>
         </div>
       </section>
     </div>
@@ -358,9 +398,11 @@
     <button id="nav-trips" class="nav-btn active" data-screen="trips">Trips</button>
     <button id="nav-daycount" class="nav-btn" data-screen="daycount">Days</button>
     <button id="nav-upcoming" class="nav-btn" data-screen="upcoming">Upcoming</button>
+    <button id="nav-map" class="nav-btn" data-screen="map">Map</button>
   </nav>
 
   <!-- Note: type="module" is required for the modular JS to work -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
