@@ -421,12 +421,41 @@ select {
   -webkit-appearance: none;
 }
 
+input[type="checkbox"] {
+  -webkit-appearance: checkbox;
+  appearance: checkbox;
+  padding: 0;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  width: 16px;
+  height: 16px;
+  box-shadow: none;
+}
+
 @media (prefers-color-scheme: dark) {
   input,
   select {
     background: rgba(44,44,46,0.9);
     border-color: rgba(99,99,102,0.8);
   }
+}
+
+.trip-options-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.checkbox-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 input:focus,

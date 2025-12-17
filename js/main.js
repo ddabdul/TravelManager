@@ -33,6 +33,7 @@ let activeTripId = null;
 let topbarMenuOpen = false;
 let lastIsMobile = null;
 let currentScreen = "trips";
+let showPastTrips = false;
 let daycountState = { passenger: "", year: new Date().getFullYear() };
 let upcomingState = { passenger: "" };
 let mapState = {
@@ -87,6 +88,8 @@ function cacheElements() {
     "trip-stats-container", "trip-pax-container", "trip-details-empty",
     // Trip selector layout containers
     "trip-fields", "trip-existing-field", "trip-new-field",
+    // Trip list toggle
+    "trip-show-past",
     // Mobile toggle button
     "toggle-alltrips-btn"
   ];
@@ -183,6 +186,12 @@ function setFlightOverlayMode(mode) {
     if (titleEl) titleEl.textContent = "Add Flight";
     if (subtitleEl) subtitleEl.textContent = "Enter flight details";
     if (labelSpan) labelSpan.textContent = "Save flight";
+  }
+}
+
+function syncShowPastTripsToggle() {
+  if (els["trip-show-past"]) {
+    els["trip-show-past"].checked = Boolean(showPastTrips);
   }
 }
 
@@ -1612,6 +1621,7 @@ function renderAllTripsDetails(allTrips, statsEl, paxEl, emptyEl) {
 
 async function init() {
   cacheElements();
+  showPastTrips = localStorage.getItem("showPastTrips") === "1";
   trips = loadTrips();
   activeTripId = trips.length ? trips[0].id : null;
   lastIsMobile = isMobileView();
@@ -1619,6 +1629,7 @@ async function init() {
   renderAll();
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
+  syncShowPastTripsToggle();
   setStatusText("api-key-status", "Loading configuration...");
   const keyStatus = await loadApiKey();
   setStatusText("api-key-status", keyStatus.message);
@@ -1634,7 +1645,7 @@ async function init() {
 
 function renderAll() {
   renderTripsJson(trips);
-  renderTripSelect(trips, activeTripId);
+  renderTripSelect(trips, activeTripId, { showPastTrips });
   renderPassengerSelect(trips);
   renderHotelSelect(trips);
   
@@ -1644,7 +1655,9 @@ function renderAll() {
   renderTripEvents(
     currentTrip,
     els["trip-events-list"],
-    els["trip-events-summary"]
+    els["trip-events-summary"],
+    null,
+    { showAllItems: showPastTrips }
   );
   
   renderAllTripsDetails(
@@ -1656,6 +1669,7 @@ function renderAll() {
 
   updateTripNewFieldVisibility();
   syncAllTripsToggle();
+  syncShowPastTripsToggle();
   updateStorageUsage();
   renderDaycountView();
   renderMapControls();
@@ -1687,7 +1701,7 @@ function getCurrentTrip() {
     };
     trips.push(trip);
     activeTripId = trip.id;
-    renderTripSelect(trips, activeTripId);
+    renderTripSelect(trips, activeTripId, { showPastTrips });
   }
   return trip;
 }
@@ -1985,6 +1999,14 @@ function setupEventListeners() {
     });
   }
 
+  if (els["trip-show-past"]) {
+    els["trip-show-past"].addEventListener("change", () => {
+      showPastTrips = Boolean(els["trip-show-past"].checked);
+      localStorage.setItem("showPastTrips", showPastTrips ? "1" : "0");
+      renderAll();
+    });
+  }
+
   els["trip-existing"].addEventListener("change", () => {
     const val = els["trip-existing"].value;
     if (val && val !== "__new__") {
@@ -2005,7 +2027,7 @@ function setupEventListeners() {
       activeTripId = null;
       updateTripNewFieldVisibility();
 
-      renderTripEvents(null, els["trip-events-list"], els["trip-events-summary"]);
+      renderTripEvents(null, els["trip-events-list"], els["trip-events-summary"], null, { showAllItems: showPastTrips });
 
       renderAllTripsDetails(
         trips,

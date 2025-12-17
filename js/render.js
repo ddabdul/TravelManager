@@ -22,8 +22,85 @@ import {
 // -------------------------
 function parseDateOnly(isoOrDateStr) {
   if (!isoOrDateStr) return null;
-  const d = new Date(isoOrDateStr); // handles YYYY-MM-DD or full ISO
+  if (isoOrDateStr instanceof Date) {
+    return isNaN(isoOrDateStr.getTime()) ? null : isoOrDateStr;
+  }
+
+  const s = String(isoOrDateStr);
+
+  // Treat YYYY-MM-DD as a local date to avoid UTC offset surprises.
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]) - 1;
+    const day = Number(m[3]);
+    const dLocal = new Date(year, month, day);
+    return isNaN(dLocal.getTime()) ? null : dLocal;
+  }
+
+  const d = new Date(s); // handles full ISO
   return isNaN(d.getTime()) ? null : d;
+}
+
+function getTodayStartLocal(now = new Date()) {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function hasTimeComponent(isoString) {
+  if (!isoString || typeof isoString !== "string") return false;
+  return /T\d{2}:\d{2}/.test(isoString);
+}
+
+function isPastFlightLeg(leg, now, todayStart) {
+  if (!leg || typeof leg !== "object") return false;
+
+  const depIso = leg.route?.departure?.scheduled;
+  if (depIso) {
+    const depDate = parseDateOnly(depIso);
+    if (!depDate) return false;
+    const cutoff = hasTimeComponent(depIso) ? now : todayStart;
+    return depDate < cutoff;
+  }
+
+  if (leg.flightDate) {
+    const d = parseDateOnly(leg.flightDate);
+    return d ? d < todayStart : false;
+  }
+
+  return false;
+}
+
+function isPastHotel(hotel, todayStart) {
+  if (!hotel || typeof hotel !== "object") return false;
+
+  // Consider the hotel "past" only once the check-out day is before today.
+  if (hotel.checkOutDate) {
+    const d = parseDateOnly(hotel.checkOutDate);
+    return d ? d < todayStart : false;
+  }
+
+  if (hotel.checkInDate) {
+    const d = parseDateOnly(hotel.checkInDate);
+    return d ? d < todayStart : false;
+  }
+
+  return false;
+}
+
+function tripHasAnyEvents(trip) {
+  return (trip?.records || []).length > 0 || (trip?.hotels || []).length > 0;
+}
+
+function tripHasUpcomingEvents(trip, now, todayStart) {
+  const hasUpcomingFlight = (trip?.records || []).some((leg) => !isPastFlightLeg(leg, now, todayStart));
+  const hasUpcomingHotel = (trip?.hotels || []).some((h) => !isPastHotel(h, todayStart));
+  return hasUpcomingFlight || hasUpcomingHotel;
+}
+
+function isTripAllPast(trip, now, todayStart) {
+  return tripHasAnyEvents(trip) && !tripHasUpcomingEvents(trip, now, todayStart);
 }
 
 function getTripStartDate(trip) {
@@ -107,7 +184,7 @@ export function renderTripsJson(trips) {
   if (savedEl) savedEl.textContent = JSON.stringify(trips, null, 2);
 }
 
-export function renderTripSelect(trips, activeTripId) {
+export function renderTripSelect(trips, activeTripId, options = {}) {
   const select = document.getElementById("trip-existing");
   select.innerHTML = "";
 
@@ -116,7 +193,19 @@ export function renderTripSelect(trips, activeTripId) {
   optNew.textContent = "New trip";
   select.appendChild(optNew);
 
-  trips.forEach((trip) => {
+  const showPastTrips = Boolean(options.showPastTrips);
+  const now = new Date();
+  const todayStart = getTodayStartLocal(now);
+
+  const visibleTrips = (trips || []).filter((trip) => {
+    if (!trip) return false;
+    if (showPastTrips) return true;
+    if (String(trip.id) === String(activeTripId)) return true;
+    if (!tripHasAnyEvents(trip)) return true;
+    return tripHasUpcomingEvents(trip, now, todayStart);
+  });
+
+  visibleTrips.forEach((trip) => {
     const opt = document.createElement("option");
     opt.value = String(trip.id);
 
@@ -139,7 +228,7 @@ export function renderTripSelect(trips, activeTripId) {
   }
 }
 
-export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
+export function renderTripEvents(trip, containerEl, summaryEl, nameEl, options = {}) {
   containerEl.innerHTML = "";
 
   if (!trip) {
@@ -153,18 +242,30 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
   }
 
   const days = buildTripEvents(trip);
+  const now = new Date();
+  const todayStart = getTodayStartLocal(now);
+  let showAllItems = Boolean(options.showAllItems);
+  if (!showAllItems && isTripAllPast(trip, now, todayStart)) {
+    showAllItems = true;
+  }
 
   // Summary stats (2nd line under Control Center) — NO trip name here
   if (summaryEl) {
-    const totalFlightLegs = (trip.records || []).length;
-    const totalHotels = (trip.hotels || []).length;
+    const hasAnyEvents = (trip.records || []).length > 0 || (trip.hotels || []).length > 0;
+    const totalFlightLegs = showAllItems
+      ? (trip.records || []).length
+      : (trip.records || []).filter((leg) => !isPastFlightLeg(leg, now, todayStart)).length;
+    const totalHotels = showAllItems
+      ? (trip.hotels || []).length
+      : (trip.hotels || []).filter((h) => !isPastHotel(h, todayStart)).length;
 
-    if (!days.length) {
+    if (!hasAnyEvents) {
       summaryEl.textContent = "No events yet";
     } else {
       const parts = [];
       if (totalFlightLegs) parts.push(`${totalFlightLegs} flight${totalFlightLegs === 1 ? "" : "s"}`);
       if (totalHotels) parts.push(`${totalHotels} hotel${totalHotels === 1 ? "" : "s"}`);
+      if (!parts.length && hasAnyEvents) parts.push(showAllItems ? "No events yet" : "No upcoming events");
 
       summaryEl.textContent = parts.join(" • ") || "No events yet";
     }
@@ -181,15 +282,22 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
   }
 
   // Render Days
+  let renderedAnyTile = false;
   for (const day of days) {
     const mobileView =
       (window.matchMedia && window.matchMedia("(max-width: 720px)").matches) ||
       window.innerWidth <= 720;
     const dateLabel = day.date ? formatFriendlyDate(day.date) : "Undated";
-    const flightsCount = day.flights.reduce(
-      (acc, fg) => acc + (Array.isArray(fg.records) ? fg.records.length : 0), 0
-    );
-    const hotelsCount = day.hotels.length;
+    const flightsCount = day.flights.reduce((acc, fg) => {
+      const records = Array.isArray(fg.records) ? fg.records : [];
+      return acc + (showAllItems ? records.length : records.filter((leg) => !isPastFlightLeg(leg, now, todayStart)).length);
+    }, 0);
+    const hotelsCount = day.hotels.reduce((acc, hEvt) => {
+      const h = hEvt?.hotel;
+      return acc + ((showAllItems || !isPastHotel(h, todayStart)) ? 1 : 0);
+    }, 0);
+
+    if (!flightsCount && !hotelsCount) continue;
     const headerIconClass = flightsCount > 0 ? "event-type-icon-flight" : "event-type-icon-hotel";
     const headerIconChar = flightsCount > 0 ? "✈︎" : "🛏"; 
 
@@ -216,7 +324,9 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
     // Render Flights
     for (const group of day.flights) {
-      const legs = (group.records || []).slice();
+      const legs = showAllItems
+        ? (group.records || []).slice()
+        : (group.records || []).filter((leg) => !isPastFlightLeg(leg, now, todayStart));
       if (!legs.length) continue;
 
       legs.sort((a, b) => {
@@ -316,9 +426,10 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
       }
     }
 
-    // Render Hotels
+      // Render Hotels
     for (const hEvt of day.hotels) {
       const h = hEvt.hotel;
+      if (!showAllItems && isPastHotel(h, todayStart)) continue;
       const checkInShort = formatShortDate(h.checkInDate);
       const checkOutShort = formatShortDate(h.checkOutDate);
       const nights = computeNights(h.checkInDate, h.checkOutDate);
@@ -354,6 +465,15 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl) {
 
     bodyEl.innerHTML = segmentsHtml;
     containerEl.appendChild(tile);
+    renderedAnyTile = true;
+  }
+
+  if (!renderedAnyTile) {
+    const empty = document.createElement("div");
+    empty.className = "tiles-empty";
+    empty.textContent = showAllItems
+      ? "No events in this trip yet."
+      : "No upcoming events in this trip. Past flights and hotels are hidden.";
+    containerEl.appendChild(empty);
   }
 }
-
