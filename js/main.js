@@ -662,6 +662,98 @@ function computeBearingDegrees(lat1, lon1, lat2, lon2) {
   return Number.isFinite(bearing) ? bearing : 0;
 }
 
+function buildGreatCircleArcLatLngs(from, to, segments) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const toDeg = (rad) => (rad * 180) / Math.PI;
+
+  const lat1 = toRad(from.lat);
+  const lon1 = toRad(from.lon);
+  const lat2 = toRad(to.lat);
+  const lon2 = toRad(to.lon);
+
+  const d = Math.acos(
+    Math.sin(lat1) * Math.sin(lat2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)
+  );
+
+  if (!Number.isFinite(d) || d === 0) {
+    return [[from.lat, from.lon], [to.lat, to.lon]];
+  }
+
+  const steps = Math.max(2, Math.floor(segments || 24));
+  const sinD = Math.sin(d);
+  const points = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const A = Math.sin((1 - t) * d) / sinD;
+    const B = Math.sin(t * d) / sinD;
+
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+    const lon = Math.atan2(y, x);
+    points.push([toDeg(lat), toDeg(lon)]);
+  }
+
+  return points;
+}
+
+function estimateArcSegments(from, to) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const lat1 = toRad(from.lat);
+  const lon1 = toRad(from.lon);
+  const lat2 = toRad(to.lat);
+  const lon2 = toRad(to.lon);
+  const d = Math.acos(
+    Math.sin(lat1) * Math.sin(lat2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)
+  );
+  if (!Number.isFinite(d) || d === 0) return 12;
+  const deg = (d * 180) / Math.PI;
+  return Math.max(12, Math.min(72, Math.ceil(deg / 3)));
+}
+
+function getProjectedPolylinePointAtFraction(pointsPx, fraction) {
+  if (!Array.isArray(pointsPx) || pointsPx.length < 2) return null;
+  const f = Math.max(0, Math.min(1, fraction));
+
+  let total = 0;
+  const lens = [];
+  for (let i = 0; i < pointsPx.length - 1; i++) {
+    const p0 = pointsPx[i];
+    const p1 = pointsPx[i + 1];
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 0;
+    lens.push(len);
+    total += len;
+  }
+  if (!total) return { point: pointsPx[0], dir: { x: 1, y: 0 } };
+
+  const target = total * f;
+  let acc = 0;
+  for (let i = 0; i < lens.length; i++) {
+    const seg = lens[i];
+    const p0 = pointsPx[i];
+    const p1 = pointsPx[i + 1];
+    if (acc + seg >= target || i === lens.length - 1) {
+      const t = seg ? (target - acc) / seg : 0;
+      const dx = p1.x - p0.x;
+      const dy = p1.y - p0.y;
+      const point = window.L.point(p0.x + dx * t, p0.y + dy * t);
+      const dlen = Math.hypot(dx, dy) || 1;
+      const dir = { x: dx / dlen, y: dy / dlen };
+      return { point, dir };
+    }
+    acc += seg;
+  }
+
+  return { point: pointsPx[pointsPx.length - 1], dir: { x: 1, y: 0 } };
+}
+
 function pad2(num) {
   return String(num).padStart(2, "0");
 }
@@ -1066,8 +1158,9 @@ function renderMapFlights() {
     `;
 
     const weight = Math.min(8, 2 + Math.log2(count + 1));
+    const arc = buildGreatCircleArcLatLngs(dep, arr, estimateArcSegments(dep, arr));
     window.L.polyline(
-      [[dep.lat, dep.lon], [arr.lat, arr.lon]],
+      arc,
       { color: "#2563eb", weight, opacity: 0.85 }
     ).bindPopup(popup).addTo(mapRoutesLayer);
 
@@ -1080,19 +1173,21 @@ function renderMapFlights() {
     const sign = dep.key === aKey ? 1 : -1;
     const offsetPx = 12;
     const zoom = mapInstance.getZoom();
-    const p1 = mapInstance.project(window.L.latLng(dep.lat, dep.lon), zoom);
-    const p2 = mapInstance.project(window.L.latLng(arr.lat, arr.lon), zoom);
-    const vx = p2.x - p1.x;
-    const vy = p2.y - p1.y;
-    const len = Math.hypot(vx, vy) || 1;
-    const nx = (-vy / len) * offsetPx * sign;
-    const ny = (vx / len) * offsetPx * sign;
+    const arcPx = arc.map((ll) => mapInstance.project(window.L.latLng(ll[0], ll[1]), zoom));
+
     const tAB = 1 / 3;
     const tBA = 2 / 3;
-    const pAB = window.L.point(p1.x + vx * tAB + nx, p1.y + vy * tAB + ny);
-    const pBA = window.L.point(p1.x + vx * tBA - nx, p1.y + vy * tBA - ny);
-    const labelLatLng = mapInstance.unproject(pAB, zoom);
-    const labelLatLngBA = mapInstance.unproject(pBA, zoom);
+    const pAB = getProjectedPolylinePointAtFraction(arcPx, tAB);
+    const pBA = getProjectedPolylinePointAtFraction(arcPx, tBA);
+    if (!pAB || !pBA) continue;
+
+    const nxAB = (-pAB.dir.y) * offsetPx * sign;
+    const nyAB = (pAB.dir.x) * offsetPx * sign;
+    const nxBA = (-pBA.dir.y) * offsetPx * sign;
+    const nyBA = (pBA.dir.x) * offsetPx * sign;
+
+    const labelLatLng = mapInstance.unproject(window.L.point(pAB.point.x + nxAB, pAB.point.y + nyAB), zoom);
+    const labelLatLngBA = mapInstance.unproject(window.L.point(pBA.point.x - nxBA, pBA.point.y - nyBA), zoom);
 
     const planeRotationAdj = (deg) => deg - 90;
     const labelHtml = `
