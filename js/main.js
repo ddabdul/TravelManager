@@ -28,6 +28,7 @@ import { renderUpcomingScreen as renderUpcomingScreenView } from "./upcomingScre
 import { renderAllTripsDetails } from "./tripStats.js";
 import { getPassengerYears } from "./daycount.js";
 import { createMapScreenController } from "./mapScreen.js";
+import { setupEventListeners as setupEventListenersBindings } from "./bindings.js";
 
 // -- Globals --
 let trips = [];
@@ -444,7 +445,54 @@ async function init() {
 
   updateAddFlightState();
   updateAddHotelState();
-  setupEventListeners();
+  setupEventListenersBindings({
+    els,
+    apiState,
+    switchScreen,
+    getTopbarMenuOpen: () => topbarMenuOpen,
+    setTopbarMenuOpen,
+    setStatusText,
+    setConfigUploadVisibility,
+    daycountState,
+    mapState,
+    upcomingState,
+    getTrips: () => trips,
+    setTrips: (next) => { trips = next; },
+    getActiveTripId: () => activeTripId,
+    setActiveTripId: (next) => { activeTripId = next; },
+    getShowPastTrips: () => showPastTrips,
+    setShowPastTrips: (next) => { showPastTrips = Boolean(next); },
+    renderDaycountView,
+    renderMapScreen,
+    renderMapFlights,
+    syncMapActionButtons,
+    setMapFullscreen,
+    renderUpcomingScreen,
+    startEditFlight,
+    saveTrips,
+    renderAll,
+    updateTripNewFieldVisibility,
+    updateAddFlightState,
+    updateAddHotelState,
+    resetFlightOverlayState,
+    validateFlightFormState,
+    validateHotelFormState,
+    getCurrentTrip,
+    findCachedRoute,
+    fetchRoute,
+    showImportedRouteForReview,
+    extractTime,
+    normalizePassengerNames,
+    normalizeFlightNumber,
+    generateHotelId,
+    getPassengerYears,
+    renderTripEvents,
+    renderAllTripsDetails,
+    getManualRouteMode: () => manualRouteMode,
+    setManualRouteMode: (next) => { manualRouteMode = Boolean(next); },
+    getEditingFlightId: () => editingFlightId,
+    syncAllTripsToggle
+  });
 
   window.addEventListener("resize", handleResponsiveResize);
   switchScreen(currentScreen);
@@ -634,416 +682,6 @@ function updateAddHotelState() {
 }
 
 // -- Event Listeners --
-
-function setupEventListeners() {
-  // Screen tabs (desktop) and bottom nav (mobile)
-  document.querySelectorAll(".tab-btn, .nav-btn").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const targetScreen = e.currentTarget.dataset.screen;
-      switchScreen(targetScreen);
-    });
-  });
-
-  // Header hamburger menu
-  if (els["topbar-menu-btn"] && els["topbar-menu-panel"]) {
-    els["topbar-menu-btn"].addEventListener("click", (e) => {
-      e.stopPropagation();
-      setTopbarMenuOpen(!topbarMenuOpen);
-    });
-    els["topbar-menu-panel"].addEventListener("click", (e) => {
-      if (e.target.closest(".menu-item")) setTopbarMenuOpen(false);
-    });
-    document.addEventListener("click", (e) => {
-      if (!topbarMenuOpen) return;
-      const panel = els["topbar-menu-panel"];
-      const btn = els["topbar-menu-btn"];
-      if (!panel || !btn) return;
-      if (panel.contains(e.target) || btn.contains(e.target)) return;
-      setTopbarMenuOpen(false);
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && topbarMenuOpen) setTopbarMenuOpen(false);
-    });
-  }
-
-  // Config upload (manual API key)
-  if (els["config-upload-btn"] && els["config-upload-file"]) {
-    els["config-upload-btn"].addEventListener("click", (e) => {
-      e.stopPropagation();
-      els["config-upload-file"].click();
-    });
-    els["config-upload-file"].addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const json = JSON.parse(text);
-        const key = ((json && (json.AVIATIONSTACK_API_KEY || json.apiKey)) || "").trim();
-        if (!key) {
-          alert("No API key found in file.");
-          return;
-        }
-        localStorage.setItem("apiKeyOverride", key);
-        apiState.key = key;
-        setStatusText("api-key-status", "API key loaded from upload.");
-        setConfigUploadVisibility(false);
-      } catch (err) {
-        console.error(err);
-        alert("Could not read config.json");
-      } finally {
-        e.target.value = "";
-      }
-    });
-  }
-
-  // Daycount selectors
-  if (els["daycount-passenger"]) {
-    els["daycount-passenger"].addEventListener("change", (e) => {
-      daycountState.passenger = e.target.value;
-      const years = getPassengerYears(trips, daycountState.passenger);
-      if (years.length) daycountState.year = years[0];
-      renderDaycountView();
-    });
-  }
-  if (els["daycount-year-list"]) {
-    els["daycount-year-list"].addEventListener("click", (e) => {
-      const btn = e.target.closest(".chip-button");
-      if (!btn) return;
-      const year = Number(btn.dataset.year);
-      if (!isNaN(year)) {
-        daycountState.year = year;
-        renderDaycountView();
-      }
-    });
-  }
-
-  // Map selectors
-  if (els["map-passenger"]) {
-    els["map-passenger"].addEventListener("change", (e) => {
-      const val = e.target.value;
-      mapState.passenger = val === "__all__" ? null : val;
-      renderMapScreen();
-    });
-  }
-  if (els["map-route"]) {
-    els["map-route"].addEventListener("change", (e) => {
-      const val = e.target.value;
-      mapState.routeKey = val === "__all__" ? null : val;
-      renderMapScreen();
-    });
-  }
-  if (els["map-badges-btn"]) {
-    els["map-badges-btn"].addEventListener("click", () => {
-      mapState.showBadges = !mapState.showBadges;
-      renderMapFlights();
-      syncMapActionButtons();
-    });
-  }
-  if (els["map-fullscreen-btn"]) {
-    els["map-fullscreen-btn"].addEventListener("click", () => {
-      setMapFullscreen(!mapState.fullscreen);
-    });
-  }
-  if (els["map-year-list"]) {
-    els["map-year-list"].addEventListener("click", (e) => {
-      const btn = e.target.closest(".chip-button");
-      if (!btn) return;
-      const year = Number(btn.dataset.year);
-      if (!isNaN(year)) {
-        mapState.year = year;
-        renderMapScreen();
-      }
-    });
-  }
-
-  if (els["upcoming-passenger"]) {
-    els["upcoming-passenger"].addEventListener("change", () => {
-      upcomingState.passenger = els["upcoming-passenger"].value || "";
-      renderUpcomingScreen();
-    });
-  }
-
-  // Delete flight/hotel from timeline
-  if (els["trip-events-list"]) {
-    els["trip-events-list"].addEventListener("click", (e) => {
-      const editBtn = e.target.closest(".edit-chip");
-      if (editBtn) {
-        const id = editBtn.dataset.id;
-        const trip = trips.find(t => String(t.id) === String(activeTripId));
-        const record = trip?.records?.find(r => String(r.id) === String(id));
-        if (record) startEditFlight(record);
-        return;
-      }
-
-      const btn = e.target.closest(".delete-chip");
-      if (!btn) return;
-      const type = btn.dataset.type;
-      const id = btn.dataset.id;
-      if (!type || !id) return;
-      if (!confirm(`Delete this ${type}?`)) return;
-
-      const trip = trips.find(t => String(t.id) === String(activeTripId));
-      if (!trip) return;
-
-      if (type === "flight") {
-        trip.records = (trip.records || []).filter(r => String(r.id) !== String(id));
-      } else if (type === "hotel") {
-        trip.hotels = (trip.hotels || []).filter(h => String(h.id) !== String(id));
-      }
-
-      saveTrips(trips);
-      renderAll();
-    });
-  }
-
-  // Mobile toggle All Trips Statistics
-  if (els["toggle-alltrips-btn"]) {
-    els["toggle-alltrips-btn"].addEventListener("click", () => {
-      const card = document.querySelector(".card-trip-details");
-      if (!card) return;
-      card.classList.toggle("is-expanded");
-      syncAllTripsToggle();
-    });
-  }
-
-  if (els["trip-show-past"]) {
-    els["trip-show-past"].addEventListener("change", () => {
-      showPastTrips = Boolean(els["trip-show-past"].checked);
-      localStorage.setItem("showPastTrips", showPastTrips ? "1" : "0");
-      renderAll();
-    });
-  }
-
-  els["trip-existing"].addEventListener("change", () => {
-    const val = els["trip-existing"].value;
-    if (val && val !== "__new__") {
-      activeTripId = val;
-      els["trip-new-name"].value = "";
-    } else {
-      activeTripId = null;
-    }
-    updateTripNewFieldVisibility();
-    renderAll();
-    updateAddFlightState();
-    updateAddHotelState();
-  });
-
-  els["trip-new-name"].addEventListener("input", () => {
-    if (els["trip-existing"].value !== "__new__") {
-      els["trip-existing"].value = "__new__";
-      activeTripId = null;
-      updateTripNewFieldVisibility();
-
-      renderTripEvents(null, els["trip-events-list"], els["trip-events-summary"], null, { showAllItems: showPastTrips });
-
-      renderAllTripsDetails(
-        trips,
-        els["trip-stats-container"], 
-        els["trip-pax-container"],
-        els["trip-details-empty"]
-      );
-    }
-    updateAddFlightState();
-    updateAddHotelState();
-  });
-
-  // UI Overlays
-  els["add-flight-btn"].addEventListener("click", () => {
-    resetFlightOverlayState();
-    els["flight-overlay"].classList.remove("hidden");
-    validateFlightFormState();
-  });
-  
-  els["close-flight-overlay"].addEventListener("click", () => {
-    resetFlightOverlayState();
-    els["flight-overlay"].classList.add("hidden");
-  });
-  els["cancel-flight-btn"].addEventListener("click", () => {
-    resetFlightOverlayState();
-    els["flight-overlay"].classList.add("hidden");
-  });
-
-  els["add-hotel-btn"].addEventListener("click", () => {
-    els["hotel-overlay"].classList.remove("hidden");
-    validateHotelFormState();
-  });
-
-  els["close-hotel-overlay"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
-  els["cancel-hotel-btn"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
-
-  // Form Validations
-  ["flight-number", "flight-date", "pax-new", "manual-airline", "manual-dep-airport", "manual-arr-airport"]
-    .forEach(id => els[id]?.addEventListener("input", validateFlightFormState));
-  els["pax-existing"].addEventListener("change", validateFlightFormState);
-  
-  ["hotel-existing", "hotel-name", "hotel-pax", "hotel-id"]
-    .forEach(id => els[id]?.addEventListener("input", validateHotelFormState));
-  ["hotel-checkin", "hotel-checkout"].forEach(id => els[id]?.addEventListener("change", validateHotelFormState));
-
-  // Flight Submit
-  els["flight-form"].addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (els.flightSubmitBtn.disabled) return;
-    const editingId = editingFlightId;
-
-    const flightNumberRaw = els["flight-number"].value.trim();
-    const flightDate = els["flight-date"].value;
-    const pnrRaw = els["pnr"].value.trim();
-
-    const selectedPax = Array.from(els["pax-existing"].selectedOptions).map(o => o.value);
-    const newPax = els["pax-new"].value.split(",").map(s => s.trim()).filter(Boolean);
-    const paxNames = normalizePassengerNames([...selectedPax, ...newPax]);
-
-    const currentTrip = getCurrentTrip();
-    const existingRecord = editingId
-      ? currentTrip.records.find(r => String(r.id) === String(editingId))
-      : null;
-    let route;
-
-    if (!manualRouteMode && !editingId) {
-      try {
-        let baseRoute = null;
-        const cached = findCachedRoute(trips, flightNumberRaw, flightDate);
-        if (cached && confirm("Found saved route. Use it?")) {
-          baseRoute = cached;
-        } else {
-          els["output"].textContent = "Fetching...";
-          baseRoute = await fetchRoute(flightNumberRaw);
-        }
-        showImportedRouteForReview(baseRoute, flightDate);
-      } catch (err) {
-        if (confirm(`API Error: ${err.message}. Enter manually?`)) {
-          manualRouteMode = true;
-          els["manual-route-section"].classList.remove("hidden");
-          validateFlightFormState();
-          return;
-        }
-        return;
-      }
-      return;
-    }
-
-    const existingRoute = existingRecord?.route || {};
-    const depTimeVal = els["manual-dep-time"].value || extractTime(existingRoute.departure?.scheduled) || "00:00";
-    const arrTimeVal = els["manual-arr-time"].value || extractTime(existingRoute.arrival?.scheduled) || "00:00";
-    route = {
-      flightNumber: normalizeFlightNumber(els["manual-flight-number"].value || flightNumberRaw),
-      airline: els["manual-airline"].value.trim(),
-      departure: {
-        airport: els["manual-dep-airport"].value.trim() || existingRoute.departure?.airport || "",
-        iata: (els["manual-dep-iata"].value || existingRoute.departure?.iata || existingRoute.departure?.icao || "").trim().toUpperCase(),
-        scheduled: `${flightDate}T${depTimeVal}:00`
-      },
-      arrival: {
-        airport: els["manual-arr-airport"].value.trim() || existingRoute.arrival?.airport || "",
-        iata: (els["manual-arr-iata"].value || existingRoute.arrival?.iata || existingRoute.arrival?.icao || "").trim().toUpperCase(),
-        scheduled: `${flightDate}T${arrTimeVal}:00`
-      }
-    };
-
-    if (editingId) {
-      const idx = currentTrip.records.findIndex(r => String(r.id) === String(editingId));
-      if (idx !== -1) {
-        const existing = currentTrip.records[idx];
-        currentTrip.records[idx] = {
-          ...existing,
-          flightDate,
-          pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
-          paxNames,
-          route
-        };
-      }
-    } else {
-      currentTrip.records.push({
-        id: Date.now(),
-        createdAt: new Date().toISOString(),
-        flightDate,
-        pnr: pnrRaw ? pnrRaw.toUpperCase() : null,
-        paxNames,
-        route
-      });
-    }
-
-    saveTrips(trips);
-    renderAll();
-    resetFlightOverlayState();
-    els["flight-overlay"].classList.add("hidden");
-  });
-
-  // Hotel Submit
-  els["hotel-form"].addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (els.hotelSubmitBtn.disabled) return;
-
-    const currentTrip = getCurrentTrip();
-    let hotelName = els["hotel-name"].value.trim();
-    if (!hotelName && els["hotel-existing"].value !== "__new__") {
-      hotelName = els["hotel-existing"].value;
-    }
-
-    currentTrip.hotels.push({
-      id: els["hotel-id"].value.trim() || generateHotelId(),
-      createdAt: new Date().toISOString(),
-      hotelName,
-      checkInDate: els["hotel-checkin"].value,
-      checkOutDate: els["hotel-checkout"].value,
-      paxCount: Number(els["hotel-pax"].value),
-      paymentType: els["hotel-payment"].value
-    });
-
-    saveTrips(trips);
-    renderAll();
-    els["hotel-overlay"].classList.add("hidden");
-    els["hotel-form"].reset();
-  });
-
-  // Export/Import
-  els["download-json"].addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(trips, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "trips.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  });
-
-  els["import-json"].addEventListener("click", () => {
-    const input = els["import-json-file"];
-    if (input) input.value = ""; // allow re-selecting the same file after clear/import
-    input?.click();
-  });
-  els["import-json-file"].addEventListener("change", (e) => {
-    const fileInput = e.target;
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const parsed = JSON.parse(evt.target.result);
-        if (Array.isArray(parsed)) {
-          trips = parsed;
-          saveTrips(trips);
-          activeTripId = trips[0]?.id || null;
-          renderAll();
-          alert("Imported!");
-        }
-      } catch(err) { alert("Invalid JSON"); }
-      fileInput.value = ""; // reset so the same file can be chosen again
-    };
-    reader.readAsText(file);
-  });
-
-  els["clear-json"].addEventListener("click", () => {
-    if(confirm("Delete all data?")) {
-      trips = [];
-      activeTripId = null;
-      saveTrips(trips);
-      renderAll();
-    }
-  });
-}
 
 // Start
 document.addEventListener("DOMContentLoaded", init);
