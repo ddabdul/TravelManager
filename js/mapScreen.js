@@ -383,6 +383,13 @@ export function createMapScreenController() {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(mapInstance);
 
+    const routesPane = mapInstance.createPane("routesPane");
+    routesPane.style.zIndex = 300;
+    const airportsPane = mapInstance.createPane("airportsPane");
+    airportsPane.style.zIndex = 450;
+    const labelsPane = mapInstance.createPane("labelsPane");
+    labelsPane.style.zIndex = 500;
+
     mapRoutesLayer = window.L.layerGroup().addTo(mapInstance);
     mapAirportsLayer = window.L.layerGroup().addTo(mapInstance);
     mapLabelsLayer = window.L.layerGroup().addTo(mapInstance);
@@ -499,6 +506,50 @@ export function createMapScreenController() {
       mapInstance.fitBounds(bounds, { padding: [18, 18] });
     }
 
+    const buildFlightsList = (flights) => {
+      const list = (flights || [])
+        .slice()
+        .sort((x, y) => x.date - y.date)
+        .slice(0, 8)
+        .map((f) => {
+          const dt = f.date
+            ? f.date.toLocaleDateString()
+            : (f.departureTime ? new Date(f.departureTime).toLocaleDateString() : "");
+          const fn = (f.flightNumber || "").trim();
+          const airline = (f.airline || "").trim();
+          const label = [airline, fn].filter(Boolean).join(" ").trim() || "Flight";
+          const dateHtml = dt ? ` &ndash; ${escapeHtml(dt)}` : "";
+          return `<div style="margin-top:4px;"><span style="font-weight:600;">${escapeHtml(label)}</span>${dateHtml}</div>`;
+        })
+        .join("");
+
+      return {
+        list,
+        moreCount: (flights || []).length > 8 ? (flights || []).length - 8 : 0
+      };
+    };
+
+    const buildUniquePax = (flights) => Array.from(
+      new Set((flights || []).flatMap((f) => (Array.isArray(f.paxNames) ? f.paxNames : [])))
+    ).sort((x, y) => x.localeCompare(y));
+
+    const buildPopupHtml = ({ depCity, arrCity, flights, countsHtml }) => {
+      const count = (flights || []).length;
+      const uniquePax = buildUniquePax(flights);
+      const { list, moreCount } = buildFlightsList(flights);
+
+      return `
+        <div style="min-width:200px; max-width:260px; line-height:1.35; word-break:break-word;">
+          <div style="font-weight:800;">${escapeHtml(depCity)} &rarr; ${escapeHtml(arrCity)}</div>
+          <div style="margin-top:4px;">${count} flight${count === 1 ? "" : "s"}</div>
+          ${countsHtml ? `<div style="margin-top:6px; color:#6b7280; font-size:12px;">${countsHtml}</div>` : ""}
+          ${uniquePax.length ? `<div style="margin-top:8px;"><b>Pax:</b> ${escapeHtml(uniquePax.join(", "))}</div>` : ""}
+          ${list ? `<div style="margin-top:10px;">${list}</div>` : ""}
+          ${moreCount ? `<div style="margin-top:6px; color: #6b7280;">+${moreCount} more</div>` : ""}
+        </div>
+      `;
+    };
+
     for (const route of routeBuckets) {
       const dep = route.a;
       const arr = route.b;
@@ -510,58 +561,40 @@ export function createMapScreenController() {
       if (!total) continue;
 
       const allFlightsForPair = route.flightsAB.concat(route.flightsBA);
-      const count = total;
-
-      const depAirports = Array.from(
-        new Set(allFlightsForPair.map((f) => (f.departureCode || "").toUpperCase()).filter(Boolean))
-      ).sort();
-      const arrAirports = Array.from(
-        new Set(allFlightsForPair.map((f) => (f.arrivalCode || "").toUpperCase()).filter(Boolean))
-      ).sort();
-
-      const uniquePax = Array.from(
-        new Set(allFlightsForPair.flatMap((f) => (Array.isArray(f.paxNames) ? f.paxNames : [])))
-      ).sort((x, y) => x.localeCompare(y));
-
-      const flightsList = allFlightsForPair
-        .slice()
-        .sort((x, y) => x.date - y.date)
-        .slice(0, 8)
-        .map((f) => {
-          const dt = f.departureTime ? new Date(f.departureTime).toLocaleString() : f.date.toLocaleDateString();
-          const fn = (f.flightNumber || "").trim();
-          const airline = (f.airline || "").trim();
-          const label = [airline, fn].filter(Boolean).join(" ").trim() || "Flight";
-          return `<div style="margin-top:4px;"><span style="font-weight:600;">${escapeHtml(label)}</span> — ${escapeHtml(dt)}</div>`;
-        })
-        .join("");
-
-      const moreCount = total > 8 ? total - 8 : 0;
-      const popup = `
-        <div style="min-width:240px;">
-          <div style="font-weight:800;">${escapeHtml(dep.city)} → ${escapeHtml(arr.city)}</div>
-          <div style="margin-top:4px;">${count} flight${count === 1 ? "" : "s"}</div>
-          <div style="margin-top:6px; color:#6b7280; font-size:12px;">
-            ${escapeHtml(dep.city)} &rarr; ${escapeHtml(arr.city)}: <b>${countAB}</b>
-            &nbsp;&nbsp;|&nbsp;&nbsp;
-            ${escapeHtml(arr.city)} &rarr; ${escapeHtml(dep.city)}: <b>${countBA}</b>
-          </div>
-          <div style="margin-top:8px;">
-            <div><b>City A:</b> ${escapeHtml(dep.city)}${depAirports.length ? ` (${escapeHtml(depAirports.join(", "))})` : ""}</div>
-            <div><b>City B:</b> ${escapeHtml(arr.city)}${arrAirports.length ? ` (${escapeHtml(arrAirports.join(", "))})` : ""}</div>
-          </div>
-          ${uniquePax.length ? `<div style="margin-top:8px;"><b>Pax:</b> ${escapeHtml(uniquePax.join(", "))}</div>` : ""}
-          ${flightsList ? `<div style="margin-top:10px;">${flightsList}</div>` : ""}
-          ${moreCount ? `<div style="margin-top:6px; color: #6b7280;">+${moreCount} more</div>` : ""}
-        </div>
-      `;
-
-      const weight = Math.min(8, 2 + Math.log2(count + 1));
+      const popupAll = buildPopupHtml({
+        depCity: dep.city,
+        arrCity: arr.city,
+        flights: allFlightsForPair,
+        countsHtml:
+          escapeHtml(dep.city) +
+          " &rarr; " +
+          escapeHtml(arr.city) +
+          ": <b>" +
+          countAB +
+          "</b> &nbsp;&nbsp;|&nbsp;&nbsp; " +
+          escapeHtml(arr.city) +
+          " &rarr; " +
+          escapeHtml(dep.city) +
+          ": <b>" +
+          countBA +
+          "</b>"
+      });
+      const popupForward = buildPopupHtml({
+        depCity: dep.city,
+        arrCity: arr.city,
+        flights: route.flightsAB
+      });
+      const popupBack = buildPopupHtml({
+        depCity: arr.city,
+        arrCity: dep.city,
+        flights: route.flightsBA
+      });
+      const weight = Math.min(9, 3 + Math.log2(total + 1));
       const arc = buildGreatCircleArcLatLngs(dep, arr, estimateArcSegments(dep, arr));
       window.L.polyline(
         arc,
-        { color: "#2563eb", weight, opacity: 0.85 }
-      ).bindPopup(popup).addTo(mapRoutesLayer);
+        { color: "#D32F2F", weight, opacity: 0.75, pane: "routesPane" }
+      ).bindPopup(popupAll).addTo(mapRoutesLayer);
 
       const bearing = computeBearingDegrees(dep.lat, dep.lon, arr.lat, arr.lon);
       const rotAB = Math.round(bearing);
@@ -605,6 +638,7 @@ export function createMapScreenController() {
         `;
         if (mapState.showBadges) {
           window.L.marker(labelLatLng, {
+            pane: "labelsPane",
             zIndexOffset: countAB,
             icon: window.L.divIcon({
               className: "route-count-icon",
@@ -613,7 +647,7 @@ export function createMapScreenController() {
               iconAnchor: [22, 22]
             })
           })
-            .bindPopup(popup)
+            .bindPopup(popupForward)
             .addTo(mapLabelsLayer);
         }
       }
@@ -627,6 +661,7 @@ export function createMapScreenController() {
         `;
         if (mapState.showBadges) {
           window.L.marker(labelLatLngBA, {
+            pane: "labelsPane",
             zIndexOffset: countBA,
             icon: window.L.divIcon({
               className: "route-count-icon",
@@ -635,7 +670,7 @@ export function createMapScreenController() {
               iconAnchor: [22, 22]
             })
           })
-            .bindPopup(popup)
+            .bindPopup(popupBack)
             .addTo(mapLabelsLayer);
         }
       }
@@ -646,10 +681,11 @@ export function createMapScreenController() {
       const airportLine = airportCodes.length ? `<div style="margin-top:6px; color:#6b7280;">${escapeHtml(airportCodes.join(", "))}</div>` : "";
 
       window.L.circleMarker([node.lat, node.lon], {
+        pane: "airportsPane",
         radius: 6,
-        color: "#111827",
+        color: "#1A237E",
         weight: 1,
-        fillColor: "#f97316",
+        fillColor: "#1A237E",
         fillOpacity: 0.9
       })
         .bindPopup(`<b>${escapeHtml(node.city)}</b>${airportLine}`)
