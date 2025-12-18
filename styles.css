@@ -1333,7 +1333,7 @@ small {
   border-top: 1px solid var(--border-subtle);
   box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
   backdrop-filter: blur(10px);
-  z-index: 30;
+  z-index: 1200;
 }
 
 .nav-btn {
@@ -1365,6 +1365,8 @@ small {
   width: 100%;
   height: 60vh;
   min-height: 360px;
+  position: relative;
+  z-index: 1;
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
   overflow: hidden;
