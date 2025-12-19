@@ -21,10 +21,17 @@ export function calculateDaysByCountry(trips, passengerName, year) {
     return { countries: {}, years: [] };
   }
 
+  const toUtcDateStart = (date) => new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  ));
+
   // Determine country at year start by simulating all flights up to the year boundary.
   let currentCountry = flights[0].departureCountry || "Other";
   for (const f of flights) {
-    if (f.date < yearStart) {
+    const depDay = toUtcDateStart(f.date);
+    if (depDay < yearStart) {
       // Move to arrival country if different.
       if (f.arrivalCountry) currentCountry = f.arrivalCountry;
     } else {
@@ -35,15 +42,16 @@ export function calculateDaysByCountry(trips, passengerName, year) {
   let cursor = new Date(yearStart);
   const stays = [];
   for (const f of flights) {
-    if (f.date < yearStart) continue;
-    if (f.date >= yearEnd) break;
+    const depDay = toUtcDateStart(f.date);
+    if (depDay < yearStart) continue;
+    if (depDay >= yearEnd) break;
 
     // Close current stay up to flight departure
-    stays.push({ country: currentCountry, start: new Date(cursor), end: new Date(f.date) });
+    stays.push({ country: currentCountry, start: new Date(cursor), end: new Date(depDay) });
 
     // Move to arrival country (if differs)
     if (f.arrivalCountry) currentCountry = f.arrivalCountry;
-    cursor = new Date(f.date);
+    cursor = new Date(depDay);
   }
 
   // Final stay to year end
