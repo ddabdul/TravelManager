@@ -185,6 +185,42 @@ export function setupEventListeners(ctx) {
   // Delete flight/hotel from timeline
   if (els["trip-events-list"] && typeof startEditFlight === "function" && typeof getActiveTripId === "function") {
     els["trip-events-list"].addEventListener("click", (e) => {
+      const copyBtn = e.target.closest(".copy-chip");
+      if (copyBtn) {
+        const value = (copyBtn.dataset.value || "").trim();
+        if (!value) return;
+        const originalLabel = copyBtn.dataset.label || copyBtn.textContent || "Copy";
+        const setLabel = (label) => { copyBtn.textContent = label; };
+        const finish = () => setTimeout(() => setLabel(originalLabel), 1200);
+
+        const copyText = async () => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(value);
+            return;
+          }
+          const temp = document.createElement("textarea");
+          temp.value = value;
+          temp.setAttribute("readonly", "");
+          temp.style.position = "absolute";
+          temp.style.left = "-9999px";
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand("copy");
+          document.body.removeChild(temp);
+        };
+
+        Promise.resolve(copyText())
+          .then(() => {
+            setLabel("Copied");
+            finish();
+          })
+          .catch(() => {
+            alert("Copy failed.");
+            finish();
+          });
+        return;
+      }
+
       const editBtn = e.target.closest(".edit-chip");
       if (editBtn) {
         const id = editBtn.dataset.id;

@@ -436,12 +436,18 @@ export function renderTripEvents(trip, containerEl, summaryEl, nameEl, options =
       const nightsLabel = nights != null ? `${nights} night${nights === 1 ? "" : "s"}` : "";
       const pax = h.paxCount || 1;
       const paymentText = h.paymentType === "prepaid" ? "Already paid" : "Pay at hotel";
+      const copyIdLabel = "Copy ID";
+      const copyIdValue = h.id ? String(h.id).trim() : "";
+      const copyIdBtn = copyIdValue
+        ? `<button class="copy-chip edit-chip" data-value="${copyIdValue}" data-label="${copyIdLabel}" aria-label="Copy confirmation number">${copyIdLabel}</button>`
+        : "";
 
       segmentsHtml += `
         <div class="itinerary-segment segment-hotel">
           <div class="segment-header-row">
             <span class="segment-label">Hotel</span>
             <span class="segment-flight-code">${h.hotelName || "Unnamed"}</span>
+            ${copyIdBtn}
             <button class="delete-chip" data-type="hotel" data-id="${h.id}" aria-label="Delete hotel">🗑</button>
           </div>
           <div class="segment-main-row">
