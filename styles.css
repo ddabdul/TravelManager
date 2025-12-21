@@ -1438,7 +1438,7 @@ small {
   display: grid;
   place-items: center;
   grid-template-rows: 1fr 1fr;
-  background: rgba(255, 255, 255, 0.92);
+  background: transparent;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 12px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.18);
