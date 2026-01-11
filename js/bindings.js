@@ -542,8 +542,12 @@ export function setupEventListeners(ctx) {
             if (Array.isArray(parsed)) {
               setTrips(parsed);
               if (typeof saveTrips === "function") saveTrips(safeGetTrips());
-              setActiveTripId(safeGetTrips()[0]?.id || null);
+              setActiveTripId(null);
+              if (els["trip-existing"]) els["trip-existing"].value = "";
+              if (els["trip-new-name"]) els["trip-new-name"].value = "";
               if (typeof renderAll === "function") renderAll();
+              if (typeof updateAddFlightState === "function") updateAddFlightState();
+              if (typeof updateAddHotelState === "function") updateAddHotelState();
               alert("Imported!");
             }
           } catch (err) {
