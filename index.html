@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Travel Manager</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="stylesheet" href="styles.css" />
@@ -91,11 +91,12 @@
               <div id="trip-existing-field" class="field">
                 <label for="trip-existing">Select Trip</label>
                 <select id="trip-existing">
+                  <option value="">Select a trip</option>
                   <option value="__new__">➕ Create New Trip</option>
                 </select>
               </div>
 
-              <div id="trip-new-field" class="field">
+              <div id="trip-new-field" class="field hidden">
                 <label for="trip-new-name">New Trip Name</label>
                 <input
                   id="trip-new-name"
@@ -457,5 +458,6 @@
   <!-- Note: type="module" is required for the modular JS to work -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/viewport-fix.js"></script>
 </body>
 </html>

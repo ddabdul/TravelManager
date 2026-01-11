@@ -186,7 +186,14 @@ export function renderTripsJson(trips) {
 
 export function renderTripSelect(trips, activeTripId, options = {}) {
   const select = document.getElementById("trip-existing");
+  if (!select) return;
+  const selectedValue = options.selectedValue ?? "";
   select.innerHTML = "";
+
+  const optPlaceholder = document.createElement("option");
+  optPlaceholder.value = "";
+  optPlaceholder.textContent = "Select a trip";
+  select.appendChild(optPlaceholder);
 
   const optNew = document.createElement("option");
   optNew.value = "__new__";
@@ -224,7 +231,7 @@ export function renderTripSelect(trips, activeTripId, options = {}) {
   });
 
   if (!activeTripId) {
-    select.value = "__new__";
+    select.value = selectedValue === "__new__" ? "__new__" : "";
   }
 }
 

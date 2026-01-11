@@ -111,7 +111,7 @@ let importNoticeShown = false;
 
 function updateTripNewFieldVisibility() {
   const selectVal = els["trip-existing"]?.value;
-  const isNew = !selectVal || selectVal === "__new__";
+  const isNew = selectVal === "__new__";
 
   const fieldsWrap = els["trip-fields"];
   const newField = els["trip-new-field"];
@@ -431,7 +431,7 @@ async function init() {
   cacheElements();
   showPastTrips = localStorage.getItem("showPastTrips") === "1";
   trips = loadTrips();
-  activeTripId = trips.length ? trips[0].id : null;
+  activeTripId = null;
   lastIsMobile = isMobileView();
 
   renderAll();
@@ -500,7 +500,8 @@ async function init() {
 
 function renderAll() {
   renderTripsJson(trips);
-  renderTripSelect(trips, activeTripId, { showPastTrips });
+  const selectedTripValue = els["trip-existing"]?.value || "";
+  renderTripSelect(trips, activeTripId, { showPastTrips, selectedValue: selectedTripValue });
   renderPassengerSelect(trips);
   renderHotelSelect(trips);
   
@@ -539,7 +540,7 @@ function hasTripChoice() {
   const sel = els["trip-existing"].value;
   const newName = els["trip-new-name"].value.trim();
   if (sel && sel !== "__new__") return true;
-  if (!sel || sel === "__new__") return newName.length > 0;
+  if (sel === "__new__") return newName.length > 0;
   return false;
 }
 
