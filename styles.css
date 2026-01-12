@@ -1358,6 +1358,15 @@ html.vv-enabled .overlay {
   color: var(--accent);
 }
 
+@media (prefers-color-scheme: dark) {
+  .delete-chip,
+  .edit-chip {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.12);
+    color: var(--text-secondary);
+  }
+}
+
 /* Bottom navigation (mobile) */
 .bottom-nav {
   position: fixed;
@@ -1371,6 +1380,14 @@ html.vv-enabled .overlay {
   box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
   backdrop-filter: blur(10px);
   z-index: 1200;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bottom-nav {
+    background: rgba(28,28,30,0.95);
+    border-top-color: rgba(255,255,255,0.08);
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.6);
+  }
 }
 
 body.overlay-open .bottom-nav {
@@ -1458,6 +1475,12 @@ html.vv-enabled .bottom-nav {
   background: #f3f4f6;
 }
 
+@media (prefers-color-scheme: dark) {
+  .map-canvas {
+    background: #0b0b0c;
+  }
+}
+
 @supports (height: 100dvh) {
   .map-canvas {
     height: 60dvh;
@@ -1512,6 +1535,22 @@ html.vv-enabled .bottom-nav {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .route-count-badge {
+    background: rgba(28,28,30,0.75);
+    border-color: rgba(255,255,255,0.18);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+  }
+
+  .route-count-num {
+    color: var(--text-main);
+  }
+
+  .route-count-arrow {
+    color: var(--accent);
+  }
 }
 
 @media (max-width: 720px) {
@@ -1723,6 +1762,31 @@ html.vv-enabled .bottom-nav {
   background: rgba(142,142,147,0.12);
   border-color: var(--border-subtle);
   color: var(--text-secondary);
+}
+
+@media (prefers-color-scheme: dark) {
+  .daycount-month {
+    background: rgba(44,44,46,0.7);
+    border-color: rgba(255,255,255,0.12);
+  }
+
+  .daycount-month.active {
+    border-color: rgba(10,132,255,0.55);
+  }
+
+  .daycount-month-detail {
+    background: rgba(28,28,30,0.9);
+    border-color: rgba(255,255,255,0.18);
+  }
+
+  .daycount-range {
+    border-color: rgba(10,132,255,0.45);
+  }
+
+  .daycount-range.daycount-range-empty {
+    background: rgba(58,58,60,0.6);
+    border-color: rgba(255,255,255,0.12);
+  }
 }
 
 /* Upcoming flights */
