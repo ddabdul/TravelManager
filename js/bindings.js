@@ -333,6 +333,54 @@ export function setupEventListeners(ctx) {
     });
   }
 
+  const toDateInputValue = (value) => {
+    if (!value) return "";
+    if (typeof value === "string") {
+      const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+    }
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const getTripDateRange = (trip) => {
+    if (!trip) return { start: "", end: "" };
+    let start = "";
+    let end = "";
+    const consider = (dateValue) => {
+      const dateStr = toDateInputValue(dateValue);
+      if (!dateStr) return;
+      if (!start || dateStr < start) start = dateStr;
+      if (!end || dateStr > end) end = dateStr;
+    };
+    (trip.records || []).forEach((rec) => {
+      consider(rec?.route?.departure?.scheduled || rec?.flightDate || rec?.createdAt);
+    });
+    (trip.hotels || []).forEach((h) => {
+      consider(h?.checkInDate || h?.createdAt);
+      consider(h?.checkOutDate || h?.createdAt);
+    });
+    return { start, end };
+  };
+
+  const applyHotelDateDefaults = () => {
+    const tripId = typeof getActiveTripId === "function" ? getActiveTripId() : null;
+    const trip = safeGetTrips().find((t) => String(t.id) === String(tripId));
+    if (!trip) return;
+    const checkIn = els["hotel-checkin"];
+    const checkOut = els["hotel-checkout"];
+    if (!checkIn || !checkOut) return;
+    const { start, end } = getTripDateRange(trip);
+    if (!start && !end) return;
+    if (!checkIn.value && start) checkIn.value = start;
+    if (!checkOut.value) checkOut.value = end || start;
+    if (checkIn.value && checkOut.value && checkOut.value < checkIn.value) {
+      checkOut.value = checkIn.value;
+    }
+  };
+
   const syncOverlayOpenState = () => {
     const openOverlay = document.querySelector(".overlay:not(.hidden)");
     document.body.classList.toggle("overlay-open", Boolean(openOverlay));
@@ -367,6 +415,7 @@ export function setupEventListeners(ctx) {
     els["add-hotel-btn"].addEventListener("click", () => {
       els["hotel-overlay"].classList.remove("hidden");
       syncOverlayOpenState();
+      applyHotelDateDefaults();
       validateHotelFormState();
     });
   }
