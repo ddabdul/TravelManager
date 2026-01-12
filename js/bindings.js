@@ -119,6 +119,7 @@ export function setupEventListeners(ctx) {
   if (els["daycount-passenger"] && daycountState && typeof renderDaycountView === "function" && typeof getPassengerYears === "function") {
     els["daycount-passenger"].addEventListener("change", (e) => {
       daycountState.passenger = e.target.value;
+      daycountState.monthSelection = null;
       const years = getPassengerYears(safeGetTrips(), daycountState.passenger);
       if (years.length) daycountState.year = years[0];
       renderDaycountView();
@@ -131,8 +132,22 @@ export function setupEventListeners(ctx) {
       const year = Number(btn.dataset.year);
       if (!isNaN(year)) {
         daycountState.year = year;
+        daycountState.monthSelection = null;
         renderDaycountView();
       }
+    });
+  }
+  if (els["daycount-results"] && daycountState && typeof renderDaycountView === "function") {
+    els["daycount-results"].addEventListener("click", (e) => {
+      const cell = e.target.closest(".daycount-month");
+      if (!cell) return;
+      const country = cell.dataset.country || "";
+      const monthIndex = Number(cell.dataset.month);
+      if (!country || Number.isNaN(monthIndex)) return;
+      const current = daycountState.monthSelection;
+      const isSame = current && current.country === country && current.monthIndex === monthIndex;
+      daycountState.monthSelection = isSame ? null : { country, monthIndex };
+      renderDaycountView();
     });
   }
 

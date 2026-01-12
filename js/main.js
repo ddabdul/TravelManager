@@ -37,7 +37,7 @@ let topbarMenuOpen = false;
 let lastIsMobile = null;
 let currentScreen = "trips";
 let showPastTrips = false;
-let daycountState = { passenger: "", year: new Date().getFullYear() };
+let daycountState = { passenger: "", year: new Date().getFullYear(), monthSelection: null };
 let upcomingState = { passenger: "" };
 let mapState = {
   passenger: null,
