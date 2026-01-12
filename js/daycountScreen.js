@@ -93,48 +93,52 @@ export function renderDaycountView({ trips, daycountState, els }) {
     let detailHtml = "";
     if (selectedCountry === country && selectedMonth !== null) {
       const ranges = rangesByCountry?.[country]?.[selectedMonth] || [];
-      const formatPlace = (label, country) => {
-        if (label && country) return `${label}, ${country}`;
-        return label || country || "";
-      };
-      const buildLegText = (label, day, airport, other, otherCountry, connector) => {
-        if (!day) return "";
-        const airportText = airport || "Unknown";
-        let text = `${label} ${day}: ${airportText}`;
-        const placeText = formatPlace(other, otherCountry);
-        if (placeText) {
-          text += ` ${connector} ${placeText}`;
-        }
-        return text;
-      };
-      const rangesHtml = ranges.length
-        ? ranges.map((range) => {
-            const entryText = buildLegText(
-              "Entry",
-              range.entryDay,
-              range.entryAirportLabel,
-              range.entryFromLabel,
-              range.entryFromCountry,
-              "from"
-            );
-            const exitText = buildLegText(
-              "Exit",
-              range.exitDay,
-              range.exitAirportLabel,
-              range.exitToLabel,
-              range.exitToCountry,
-              "to"
-            );
-            const parts = [entryText, exitText].filter(Boolean);
-            return `<span class="daycount-range">${parts.join(" • ")}</span>`;
-          }).join("")
-        : `<span class="daycount-range daycount-range-empty">No stay recorded</span>`;
-      detailHtml = `
-        <div class="daycount-month-detail">
-          <span class="daycount-month-detail-label">${monthLabels[selectedMonth]}</span>
-          ${rangesHtml}
-        </div>
-      `;
+      const monthDaysTotal = new Date(Date.UTC(daycountState.year, selectedMonth + 1, 0)).getUTCDate();
+      const monthTotal = months[selectedMonth] || 0;
+      if (monthTotal < monthDaysTotal) {
+        const formatPlace = (label, country) => {
+          if (label && country) return `${label}, ${country}`;
+          return label || country || "";
+        };
+        const buildLegText = (label, day, airport, other, otherCountry, connector) => {
+          if (!day) return "";
+          const airportText = airport || "Unknown";
+          let text = `${label} ${day}: ${airportText}`;
+          const placeText = formatPlace(other, otherCountry);
+          if (placeText) {
+            text += ` ${connector} ${placeText}`;
+          }
+          return text;
+        };
+        const rangesHtml = ranges.length
+          ? ranges.map((range) => {
+              const entryText = buildLegText(
+                "Entry",
+                range.entryDay,
+                range.entryAirportLabel,
+                range.entryFromLabel,
+                range.entryFromCountry,
+                "from"
+              );
+              const exitText = buildLegText(
+                "Exit",
+                range.exitDay,
+                range.exitAirportLabel,
+                range.exitToLabel,
+                range.exitToCountry,
+                "to"
+              );
+              const parts = [entryText, exitText].filter(Boolean);
+              return `<span class="daycount-range">${parts.join(" • ")}</span>`;
+            }).join("")
+          : `<span class="daycount-range daycount-range-empty">No stay recorded</span>`;
+        detailHtml = `
+          <div class="daycount-month-detail">
+            <span class="daycount-month-detail-label">${monthLabels[selectedMonth]}</span>
+            ${rangesHtml}
+          </div>
+        `;
+      }
     }
     return `
       <div class="daycount-country">
