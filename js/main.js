@@ -314,6 +314,7 @@ function startEditFlight(record) {
 
   els["manual-route-section"]?.classList.remove("hidden");
   els["flight-overlay"]?.classList.remove("hidden");
+  document.body.classList.add("overlay-open");
   validateFlightFormState();
 }
 

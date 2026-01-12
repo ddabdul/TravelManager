@@ -333,11 +333,17 @@ export function setupEventListeners(ctx) {
     });
   }
 
+  const syncOverlayOpenState = () => {
+    const openOverlay = document.querySelector(".overlay:not(.hidden)");
+    document.body.classList.toggle("overlay-open", Boolean(openOverlay));
+  };
+
   // UI Overlays
   if (els["add-flight-btn"] && els["flight-overlay"] && typeof resetFlightOverlayState === "function" && typeof validateFlightFormState === "function") {
     els["add-flight-btn"].addEventListener("click", () => {
       resetFlightOverlayState();
       els["flight-overlay"].classList.remove("hidden");
+      syncOverlayOpenState();
       validateFlightFormState();
     });
   }
@@ -346,27 +352,36 @@ export function setupEventListeners(ctx) {
     els["close-flight-overlay"].addEventListener("click", () => {
       resetFlightOverlayState();
       els["flight-overlay"].classList.add("hidden");
+      syncOverlayOpenState();
     });
   }
   if (els["cancel-flight-btn"] && els["flight-overlay"] && typeof resetFlightOverlayState === "function") {
     els["cancel-flight-btn"].addEventListener("click", () => {
       resetFlightOverlayState();
       els["flight-overlay"].classList.add("hidden");
+      syncOverlayOpenState();
     });
   }
 
   if (els["add-hotel-btn"] && els["hotel-overlay"] && typeof validateHotelFormState === "function") {
     els["add-hotel-btn"].addEventListener("click", () => {
       els["hotel-overlay"].classList.remove("hidden");
+      syncOverlayOpenState();
       validateHotelFormState();
     });
   }
 
   if (els["close-hotel-overlay"] && els["hotel-overlay"]) {
-    els["close-hotel-overlay"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
+    els["close-hotel-overlay"].addEventListener("click", () => {
+      els["hotel-overlay"].classList.add("hidden");
+      syncOverlayOpenState();
+    });
   }
   if (els["cancel-hotel-btn"] && els["hotel-overlay"]) {
-    els["cancel-hotel-btn"].addEventListener("click", () => els["hotel-overlay"].classList.add("hidden"));
+    els["cancel-hotel-btn"].addEventListener("click", () => {
+      els["hotel-overlay"].classList.add("hidden");
+      syncOverlayOpenState();
+    });
   }
 
   // Form Validations
@@ -492,6 +507,7 @@ export function setupEventListeners(ctx) {
       if (typeof renderAll === "function") renderAll();
       if (typeof resetFlightOverlayState === "function") resetFlightOverlayState();
       els["flight-overlay"]?.classList.add("hidden");
+      syncOverlayOpenState();
     });
   }
 
@@ -520,6 +536,7 @@ export function setupEventListeners(ctx) {
       if (typeof saveTrips === "function") saveTrips(safeGetTrips());
       if (typeof renderAll === "function") renderAll();
       els["hotel-overlay"]?.classList.add("hidden");
+      syncOverlayOpenState();
       els["hotel-form"]?.reset();
     });
   }

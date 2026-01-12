@@ -1110,7 +1110,7 @@ small {
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 2200;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -1371,6 +1371,10 @@ html.vv-enabled .overlay {
   box-shadow: 0 -6px 18px rgba(0,0,0,0.08);
   backdrop-filter: blur(10px);
   z-index: 1200;
+}
+
+body.overlay-open .bottom-nav {
+  display: none;
 }
 
 html.vv-enabled .bottom-nav {
