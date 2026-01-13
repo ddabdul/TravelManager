@@ -381,6 +381,54 @@ export function setupEventListeners(ctx) {
     }
   };
 
+  let pillRaf = 0;
+  const updateDaycountPillSize = (pillEl) => {
+    if (!pillEl) return;
+    const parent = pillEl.parentElement;
+    if (!parent) return;
+    const parentWidth = parent.clientWidth;
+    if (!parentWidth) return;
+    const maxWidth = Math.max(0, Math.floor(parentWidth * 0.92));
+
+    pillEl.style.maxWidth = `${maxWidth}px`;
+    pillEl.style.width = "fit-content";
+    pillEl.style.height = "auto";
+    pillEl.style.minWidth = "0";
+    pillEl.style.display = "inline-flex";
+    pillEl.style.alignItems = "center";
+    pillEl.style.whiteSpace = "normal";
+    pillEl.style.overflowWrap = "anywhere";
+    pillEl.style.wordBreak = "break-word";
+    pillEl.style.boxSizing = "border-box";
+  };
+
+  const updateAllDaycountPills = () => {
+    document.querySelectorAll(".daycount-range").forEach(updateDaycountPillSize);
+  };
+
+  const schedulePillUpdate = () => {
+    if (pillRaf) return;
+    pillRaf = requestAnimationFrame(() => {
+      pillRaf = 0;
+      updateAllDaycountPills();
+    });
+  };
+
+  if (els["daycount-results"]) {
+    const observer = new MutationObserver(() => {
+      schedulePillUpdate();
+    });
+    observer.observe(els["daycount-results"], {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    schedulePillUpdate();
+  }
+
+  window.addEventListener("resize", schedulePillUpdate);
+  window.addEventListener("orientationchange", schedulePillUpdate);
+
   const syncOverlayOpenState = () => {
     const openOverlay = document.querySelector(".overlay:not(.hidden)");
     document.body.classList.toggle("overlay-open", Boolean(openOverlay));
